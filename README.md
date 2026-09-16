@@ -64,8 +64,16 @@ Phones stop sending GPS from a browser tab once the screen locks or another app 
 front, so the dot updates while the page is up and pauses in between. While sharing is
 on, the page asks the phone to keep the screen awake to help with that.
 
-Location data is stored in `data/locations.json` (latest position per person) and
-`data/track-YYYY-MM-DD.jsonl` (one line per report).
+Location data is stored in `data/locations.json` (latest position per label) and
+`data/track-YYYY-MM-DD.jsonl` (one line per report). The map shows positions from the
+last 2 hours. To wipe the remembered dots right away (for example after testing from
+several devices), run this on the server while it is up:
+
+```
+curl -X DELETE http://localhost:8080/api/locations
+```
+
+Trail files are not affected.
 
 ## Other ways to host it
 

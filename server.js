@@ -11,7 +11,8 @@
 //   GET  /api/export.csv   full sheet (seed data + edits) as CSV
 //   GET  /api/export.json  full sheet as JSON
 //   POST /api/location     phone reports its GPS position {name, lat, lng, acc}
-//   GET  /api/locations    latest position of everyone sharing (last 12 h)
+//   GET  /api/locations    latest position of everyone sharing (last 2 h)
+//   DELETE /api/locations  forget all remembered positions (clears stale dots)
 //   GET  /api/track?name=X&date=YYYY-MM-DD   that person's breadcrumb trail for a day
 
 const http = require('http');
@@ -123,8 +124,13 @@ http.createServer(async (req, res) => {
       const rec = recordLocation(JSON.parse(await readBody(req) || '{}'));
       return rec ? send(res, 200, JSON.stringify(rec)) : send(res, 400, '{"error":"need name, lat, lng"}');
     }
+    if (p === '/api/locations' && req.method === 'DELETE') {   // forget every remembered position (trail files are kept)
+      locations = {}; persistLocations();
+      return send(res, 200, '{"cleared":true}');
+    }
     if (p === '/api/locations') {
-      const cutoff = Date.now() - 12 * 3600 * 1000;
+      // only positions from the last 2 hours; anything older is history, not "where he is"
+      const cutoff = Date.now() - 2 * 3600 * 1000;
       return send(res, 200, JSON.stringify(Object.values(locations).filter(l => l.ts > cutoff)));
     }
     if (p === '/api/track') return send(res, 200, JSON.stringify(readTrack(url.searchParams.get('name'), url.searchParams.get('date'))));
