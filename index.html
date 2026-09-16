@@ -108,15 +108,6 @@
   .person.stale i { background: #9a9a9a; box-shadow: 0 2px 6px rgba(0,0,0,.3); }
   .person.stale b { background: #9a9a9a; }
 
-  /* name prompt for location sharing */
-  dialog { border: 0; border-radius: 14px; padding: 20px; width: min(92vw, 360px); box-shadow: 0 8px 32px rgba(0,0,0,.3); color: var(--ink); font-family: var(--font); }
-  dialog::backdrop { background: rgba(58,58,58,.45); }
-  dialog h3 { margin: 0 0 4px; font-family: var(--font-display); font-size: 22px; }
-  dialog p { margin: 0 0 12px; color: var(--ink-soft); font-size: 14px; line-height: 1.4; }
-  dialog input { width: 100%; height: 46px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); padding: 0 12px; font-size: 16px; }
-  dialog .row { display: flex; gap: 10px; margin-top: 14px; }
-  dialog .row button { flex: 1; height: 46px; border: 0; border-radius: 8px; font-weight: 700; font-size: 15px; background: var(--field); }
-  dialog .row button.primary { background: var(--orange); }
 
   /* List */
   .list-bar { display: flex; gap: 8px; padding: 10px 16px; background: var(--paper); border-bottom: 1px solid var(--line); align-items: center; flex-wrap: wrap; }
@@ -331,17 +322,6 @@
 </div>
 <div class="toast" id="toast" role="status"></div>
 
-<dialog id="nameDlg">
-  <form method="dialog" onsubmit="startShareWithName()">
-    <h3>Who's using this phone?</h3>
-    <p>Your name is shown next to your dot on the office map while this page is open. You'll only be asked once.</p>
-    <input type="text" id="shareName" placeholder="Your name" autocomplete="name" maxlength="40" required>
-    <div class="row">
-      <button type="submit" class="primary">Save name</button>
-    </div>
-  </form>
-</dialog>
-
 <script src="data.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
@@ -354,6 +334,7 @@
    ========================================================= */
 const SEED = window.POLE_DATA || [];
 const LS_KEY = 'wm6-pole-edits-v1';
+const TECH_NAME = 'Clint';   // label shown on the office map for whoever allows location on this site
 const HEIGHT_FIELDS = [
   ['power',    'Power',                   'lowest power conductor / neutral'],
   ['catv',     'CATV',                    ''],
@@ -525,26 +506,13 @@ function goNearest() {
 
 /* ---------- Live location sharing (needs the server) ---------- */
 // Tracking is automatic: once the browser grants location permission and the server is
-// reachable, the phone reports its position while the page is open. The only question
-// asked is the person's name, once, so the dot on the office map is labelled.
-const share = { name: '', lastSent: 0, lastPos: null, timer: null, wake: null, asked: false };
-try { share.name = localStorage.getItem('wm6-name') || ''; } catch (e) {}
+// reachable, the phone reports its position (labelled TECH_NAME) while the page is open.
+const share = { name: TECH_NAME, lastSent: 0, lastPos: null, timer: null, wake: null };
 function sharing() { return sync.available && !!share.name; }
 function onPosition() {
-  if (!sync.available) return;
-  if (!share.name) {
-    if (!share.asked) { share.asked = true; document.getElementById('shareName').value = ''; document.getElementById('nameDlg').showModal(); }
-    return;
-  }
+  if (!sharing()) return;
   if (!share.timer) { share.timer = setInterval(sendLocation, 10000); requestWake(); }
   sendLocation();
-}
-function startShareWithName() {
-  const n = document.getElementById('shareName').value.trim();
-  if (!n) return;
-  share.name = n; try { localStorage.setItem('wm6-name', n); } catch (e) {}
-  toast('Thanks ' + n + ', you now show on the office map');
-  onPosition();
 }
 async function sendLocation() {
   if (!sharing() || !me) return;
@@ -574,7 +542,7 @@ async function pollLocations() {
   try { const r = await fetch('api/locations', { cache: 'no-store' }); if (!r.ok) return; list = await r.json(); } catch (e) { return; }
   const seen = new Set();
   list.forEach(l => {
-    if (sharing() && l.name === share.name) return;   // the phone already shows itself as the blue dot
+    if (share.timer && l.name === share.name) return;   // this device is the one reporting; it already shows itself as the blue dot
     seen.add(l.name);
     if (people[l.name]) people[l.name].setLatLng([l.lat, l.lng]).setIcon(personIcon(l));
     else people[l.name] = L.marker([l.lat, l.lng], { icon: personIcon(l), zIndexOffset: 900 }).addTo(map).on('click', () => toggleTrail(l.name));
