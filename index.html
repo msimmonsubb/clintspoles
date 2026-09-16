@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#3a3a3a">
+<title>West Mountain Phase 6 Poles</title>
+<link rel="icon" href="ubb-logo.png">
+<link rel="apple-touch-icon" href="ubb-logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+  :root {
+    --ink: #3a3a3a;
+    --ink-soft: #6b6b6b;
+    --orange: #f68b1d;
+    --orange-deep: #b95f05;
+    --paper: #ffffff;
+    --field: #f3f2ee;
+    --line: #d9d7d1;
+    --replace: #c8322b;
+    --blue: #2a7fd4;
+    --radius: 10px;
+    --header-h: 60px;
+    --font: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-display: "Barlow Semi Condensed", "Barlow", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: var(--font);
+    color: var(--ink);
+    background: var(--field);
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;
+    display: flex; flex-direction: column;
+    height: 100dvh;
+  }
+  button, input, select { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  :focus-visible { outline: 3px solid var(--orange); outline-offset: 2px; }
+
+  /* ---------- Header ---------- */
+  header {
+    flex: 0 0 auto;
+    background: var(--paper);
+    border-bottom: 3px solid var(--orange);
+    padding: 8px 16px 8px;
+    padding-top: calc(8px + env(safe-area-inset-top));
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    grid-template-areas: "logo title toggle" "logo progress toggle";
+    column-gap: 14px; row-gap: 2px; align-items: center;
+  }
+  .logo { grid-area: logo; height: 40px; width: auto; display: block; }
+  .title { grid-area: title; font-family: var(--font-display); font-weight: 700; font-size: 20px; line-height: 1.1; margin: 0; letter-spacing: .01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .progress { grid-area: progress; display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--ink-soft); min-width: 0; }
+  .progress .bar { flex: 1 1 60px; max-width: 140px; height: 6px; background: var(--field); border-radius: 3px; overflow: hidden; }
+  .progress .bar i { display: block; height: 100%; background: var(--orange); width: 0; transition: width .3s; }
+  .progress .sync { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .progress .sync::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ink-soft); margin-right: 5px; vertical-align: 1px; }
+  .progress .sync.ok::before { background: #2e9e4f; }
+  .progress .sync.pending::before { background: var(--orange); }
+
+  .toggle { grid-area: toggle; display: flex; background: var(--field); border-radius: 999px; padding: 3px; }
+  .toggle button {
+    border: 0; background: transparent; border-radius: 999px;
+    padding: 8px 16px; font-weight: 600; font-size: 15px; color: var(--ink-soft);
+    min-height: 40px;
+  }
+  .toggle button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+
+  /* ---------- Views ---------- */
+  main { flex: 1 1 auto; position: relative; min-height: 0; }
+  .view { position: absolute; inset: 0; display: none; }
+  .view.active { display: block; }
+
+  /* Map */
+  #map { position: absolute; inset: 0; background: #e6e4dd; }
+  #map.hide-labels .pole-label { display: none; }
+  .map-tools { position: absolute; right: 12px; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 500; display: flex; flex-direction: column; gap: 10px; }
+  .map-tools button, .legend {
+    background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius);
+    box-shadow: 0 2px 8px rgba(58,58,58,.18);
+  }
+  .map-tools button { width: 48px; height: 48px; display: grid; place-items: center; padding: 0; }
+  .map-tools button svg { width: 24px; height: 24px; fill: none; stroke: var(--ink); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .map-tools button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); }
+  .map-tools button[aria-pressed="true"] svg { stroke: #fff; }
+  .legend { position: absolute; left: 12px; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 500; padding: 8px 12px; font-size: 13px; display: flex; gap: 14px; }
+  .legend span::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--ink); margin-right: 6px; vertical-align: -1px; background: #fff; }
+  .legend .done::before { background: var(--orange); }
+  .legend .replace::before { background: var(--replace); border-color: var(--replace); }
+  .pole-label { background: transparent; border: 0; box-shadow: none; font: 600 12px var(--font); color: var(--ink); text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff; padding: 0 0 0 2px; }
+  .pole-label::before { display: none; }
+  .leaflet-control-attribution { font-size: 10px; }
+  .me-dot { background: var(--blue); border: 2px solid #fff; border-radius: 50%; box-shadow: 0 0 0 2px rgba(42,127,212,.4); }
+
+  /* List */
+  .list-bar { display: flex; gap: 8px; padding: 10px 16px; background: var(--paper); border-bottom: 1px solid var(--line); align-items: center; flex-wrap: wrap; }
+  .list-bar input[type=search] {
+    flex: 1 1 160px; min-width: 0; height: 42px; border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 0 12px; background: var(--field);
+  }
+  .chips { display: flex; gap: 6px; }
+  .chips button { border: 1px solid var(--line); background: var(--paper); border-radius: 999px; padding: 0 12px; height: 34px; font-weight: 500; font-size: 14px; }
+  .chips button[aria-pressed="true"] { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .btn-export { height: 42px; border: 0; border-radius: var(--radius); background: var(--orange); color: var(--ink); font-weight: 700; padding: 0 14px; }
+  #viewList.active { display: flex; flex-direction: column; }
+  .list-bar { flex: 0 0 auto; }
+  .table-wrap { flex: 1 1 auto; min-height: 0; overflow: auto; -webkit-overflow-scrolling: touch; }
+  table { border-collapse: separate; border-spacing: 0; min-width: 100%; font-size: 14px; background: var(--paper); }
+  th, td { padding: 9px 10px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; vertical-align: middle; }
+  th { position: sticky; top: 0; background: var(--ink); color: #fff; font-weight: 600; font-size: 13px; z-index: 2; }
+  th:first-child, td:first-child { position: sticky; left: 0; z-index: 1; background: var(--paper); font-weight: 700; box-shadow: 1px 0 0 var(--line); }
+  th:first-child { z-index: 3; background: var(--ink); }
+  tr[data-id] { cursor: pointer; }
+  tr[data-id]:active td { background: #fff4e8; }
+  td.status { width: 8px; padding: 0 0 0 8px; }
+  td.status i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--ink); background: #fff; }
+  tr.done td.status i { background: var(--orange); }
+  tr.replace td.status i { background: var(--replace); border-color: var(--replace); }
+  tr.replace td:nth-child(10) { color: var(--replace); font-weight: 600; }
+  td.muted, .muted { color: var(--ink-soft); }
+  .empty { padding: 40px 20px; text-align: center; color: var(--ink-soft); }
+
+  /* ---------- Pole sheet ---------- */
+  .scrim { position: fixed; inset: 0; background: rgba(58,58,58,.35); z-index: 900; opacity: 0; pointer-events: none; transition: opacity .2s; }
+  .scrim.show { opacity: 1; pointer-events: auto; }
+  .sheet {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 1000;
+    max-height: 92dvh; background: var(--paper); border-radius: 18px 18px 0 0;
+    transform: translateY(105%); transition: transform .25s ease-out;
+    display: flex; flex-direction: column;
+    box-shadow: 0 -4px 24px rgba(58,58,58,.25);
+  }
+  .sheet.show { transform: translateY(0); }
+  .sheet-head { position: relative; padding: 12px 16px 10px; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: 1fr auto; align-items: start; gap: 8px; }
+  .sheet-head::before { content: ""; position: absolute; top: 6px; left: 50%; width: 40px; height: 4px; margin-left: -20px; border-radius: 2px; background: var(--line); }
+  .sheet-head h2 { margin: 6px 0 0; font-family: var(--font-display); font-size: 26px; line-height: 1; font-weight: 700; }
+  .sheet-head h2 small { font-size: 15px; font-weight: 600; color: var(--ink-soft); margin-left: 8px; font-family: var(--font); }
+  .sheet-head .sub { font-size: 14px; color: var(--ink-soft); margin-top: 4px; display: flex; gap: 12px; flex-wrap: wrap; }
+  .sheet-head .sub a { color: var(--orange-deep); font-weight: 600; text-decoration: none; }
+  .close { margin-top: 8px; width: 40px; height: 40px; border-radius: 50%; border: 0; background: var(--field); font-size: 22px; line-height: 1; }
+  .sheet-body { overflow: auto; padding: 4px 16px 16px; margin: 0; -webkit-overflow-scrolling: touch; }
+  fieldset { border: 0; margin: 12px 0 0; padding: 0; min-width: 0; }
+  legend { font-family: var(--font-display); font-weight: 700; font-size: 17px; padding: 0; margin-bottom: 4px; }
+
+  /* Height rows: the ruler rail is the one visual flourish */
+  .heights { position: relative; padding-left: 16px; }
+  .heights::before {
+    content: ""; position: absolute; left: 0; top: 4px; bottom: 4px; width: 9px;
+    border-left: 2px solid var(--ink);
+    background:
+      repeating-linear-gradient(to bottom, var(--ink) 0 1px, transparent 1px 36px) 0 0 / 9px 100% no-repeat,
+      repeating-linear-gradient(to bottom, var(--ink) 0 1px, transparent 1px 9px) 0 0 / 5px 100% no-repeat;
+    opacity: .5;
+  }
+  .hrow { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+  .hrow:last-child { border-bottom: 0; }
+  .hrow label { font-weight: 500; font-size: 15px; }
+  .hrow label small { display: block; color: var(--ink-soft); font-weight: 400; font-size: 12px; }
+  .hgt { display: flex; align-items: center; gap: 4px; }
+  .hgt input {
+    width: 54px; height: 46px; text-align: right; border: 1px solid var(--line); border-radius: 8px;
+    background: var(--field); padding: 0 6px; font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums;
+  }
+  .hgt input:disabled { opacity: .35; }
+  .hgt .unit { font-size: 20px; font-weight: 600; width: 14px; color: var(--ink-soft); }
+  .hgt .na { margin-left: 6px; height: 46px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--paper); font-weight: 600; font-size: 13px; color: var(--ink-soft); }
+  .hgt .na[aria-pressed="true"] { background: var(--ink); color: #fff; border-color: var(--ink); }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .f { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; min-width: 0; }
+  .f label { font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+  .f input[type=text], .f select { height: 46px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); padding: 0 10px; font-size: 16px; width: 100%; }
+  .seg { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg button { flex: 1; height: 46px; border: 0; background: var(--field); font-weight: 600; font-size: 15px; }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+  .seg button.yes[aria-pressed="true"] { background: var(--replace); }
+  .coords { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-variant-numeric: tabular-nums; font-size: 14px; }
+  .coords .link { background: none; border: 1px solid var(--line); border-radius: 8px; height: 34px; padding: 0 10px; font-size: 13px; font-weight: 600; color: var(--ink); }
+
+  .sheet-foot { padding: 12px 16px; padding-bottom: calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); display: flex; gap: 10px; align-items: center; background: var(--paper); }
+  .btn-save { flex: 1; height: 52px; border: 0; border-radius: var(--radius); background: var(--orange); color: var(--ink); font-weight: 700; font-size: 18px; }
+  .btn-save:active { filter: brightness(.95); }
+  .saved-at { font-size: 12px; color: var(--ink-soft); max-width: 40%; }
+
+  .toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translate(-50%, 20px); background: var(--ink); color: #fff; padding: 10px 18px; border-radius: 999px; font-weight: 600; font-size: 14px; z-index: 1100; opacity: 0; transition: .25s; pointer-events: none; white-space: nowrap; max-width: 92vw; overflow: hidden; text-overflow: ellipsis; }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  /* ---------- Wider screens: sheet becomes a side panel ---------- */
+  @media (min-width: 900px) {
+    .sheet { left: auto; top: calc(var(--header-h) + 12px); right: 12px; bottom: 12px; width: 420px; max-height: none; border-radius: var(--radius); transform: translateX(120%); }
+    .sheet.show { transform: none; }
+    .scrim { display: none; }
+    .sheet-head::before { display: none; }
+    .title { font-size: 22px; }
+  }
+  @media (max-width: 480px) {
+    header { padding: 6px 12px; padding-top: calc(6px + env(safe-area-inset-top)); grid-template-columns: auto 1fr; grid-template-areas: "logo title" "logo progress" "toggle toggle"; row-gap: 4px; }
+    .logo { height: 34px; }
+    .title { font-size: 17px; }
+    .toggle { margin-top: 4px; }
+    .toggle button { flex: 1; }
+    .list-bar { padding: 8px 12px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .sheet, .scrim, .toast, .progress .bar i { transition: none; } }
+</style>
+</head>
+<body>
+
+<header>
+  <img class="logo" src="ubb-logo.png" alt="Utah Broadband">
+  <h1 class="title">West Mountain Phase 6</h1>
+  <div class="progress">
+    <span id="progText">0 of 0 measured</span>
+    <span class="bar"><i id="progBar"></i></span>
+    <span class="sync local" id="syncPill">Saved on this phone</span>
+  </div>
+  <div class="toggle" role="tablist" aria-label="View">
+    <button id="tabMap" role="tab" aria-pressed="true" onclick="showView('map')">Map</button>
+    <button id="tabList" role="tab" aria-pressed="false" onclick="showView('list')">Info</button>
+  </div>
+</header>
+
+<main>
+  <section id="viewMap" class="view active">
+    <div id="map"></div>
+    <div class="legend" aria-hidden="true"><span>To do</span><span class="done">Measured</span><span class="replace">Replace</span></div>
+    <div class="map-tools">
+      <button id="btnSat" aria-pressed="false" title="Satellite view" onclick="toggleSatellite()">
+        <svg viewBox="0 0 24 24"><path d="M3 9l9-5 9 5-9 5-9-5z"/><path d="M3 14l9 5 9-5"/></svg>
+      </button>
+      <button id="btnNearest" title="Nearest pole still to measure" onclick="goNearest()">
+        <svg viewBox="0 0 24 24"><path d="M12 22s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/></svg>
+      </button>
+      <button id="btnLocate" title="Show my location" onclick="locateMe()">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+      </button>
+    </div>
+  </section>
+
+  <section id="viewList" class="view">
+    <div class="list-bar">
+      <input type="search" id="search" placeholder="Pole # or street" autocomplete="off" oninput="renderTable()">
+      <div class="chips" role="group" aria-label="Filter">
+        <button data-filter="all" aria-pressed="true" onclick="setFilter('all')">All</button>
+        <button data-filter="todo" aria-pressed="false" onclick="setFilter('todo')">To do</button>
+        <button data-filter="done" aria-pressed="false" onclick="setFilter('done')">Measured</button>
+      </div>
+      <button class="btn-export" onclick="exportSheet()">Export sheet</button>
+    </div>
+    <div class="table-wrap">
+      <table id="table">
+        <thead><tr>
+          <th>Pole #</th><th></th><th>Address</th><th>Power</th><th>CATV</th><th>Phone</th><th>Other</th>
+          <th>Road / street crossing</th><th>Proposed attachment</th><th>Suggest replace</th><th>Material</th><th>Coords</th><th>Section</th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+      <div class="empty" id="empty" hidden>No poles match that search.</div>
+    </div>
+  </section>
+</main>
+
+<div class="scrim" id="scrim" onclick="closeSheet()"></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+  <div class="sheet-head">
+    <div>
+      <h2 id="sheetTitle">Pole</h2>
+      <div class="sub" id="sheetSub"></div>
+    </div>
+    <button class="close" type="button" onclick="closeSheet()" aria-label="Close">×</button>
+  </div>
+  <form class="sheet-body" id="form" onsubmit="event.preventDefault(); savePole()">
+    <fieldset>
+      <legend>Attachment heights</legend>
+      <div class="heights" id="heights"></div>
+    </fieldset>
+    <fieldset>
+      <legend>Pole</legend>
+      <div class="f"><label>Suggest replace</label>
+        <div class="seg" id="segReplace">
+          <button type="button" data-val="No" onclick="setReplace('No')">No</button>
+          <button type="button" data-val="Yes" class="yes" onclick="setReplace('Yes')">Yes, replace</button>
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="f"><label for="fMaterial">Material</label>
+          <select id="fMaterial">
+            <option value="">—</option><option>WRC</option><option>Steel</option><option>DF</option><option>SYP</option><option>Concrete</option><option>Fiberglass</option><option>Other</option>
+          </select>
+        </div>
+        <div class="f"><label for="fSection">Section</label><input type="text" id="fSection" autocomplete="off"></div>
+        <div class="f"><label for="fPole">Pole #</label><input type="text" id="fPole" autocomplete="off"></div>
+        <div class="f"><label for="fAddress">Address</label><input type="text" id="fAddress" autocomplete="off"></div>
+      </div>
+      <div class="f"><label>Coordinates</label>
+        <div class="coords"><span id="fCoords"></span><button type="button" class="link" onclick="useMyLocation()">Use my GPS position</button></div>
+      </div>
+    </fieldset>
+  </form>
+  <div class="sheet-foot">
+    <button class="btn-save" type="submit" form="form">Save pole</button>
+    <span class="saved-at" id="savedAt"></span>
+  </div>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script src="data.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+<script>
+/* =========================================================
+   Data model
+   - SEED: rows from the spreadsheet (data.js), never modified
+   - edits: per-pole field overrides, saved in localStorage and
+     (if the site is hosted with server.js) synced to the server
+   ========================================================= */
+const SEED = window.POLE_DATA || [];
+const LS_KEY = 'wm6-pole-edits-v1';
+const HEIGHT_FIELDS = [
+  ['power',    'Power',                   'lowest power conductor / neutral'],
+  ['catv',     'CATV',                    ''],
+  ['phone',    'Phone',                   ''],
+  ['other',    'Other',                   'any other attachment'],
+  ['crossing', 'Road / street crossing',  'lowest wire over the road'],
+  ['proposed', 'Proposed attachment',     'where our fiber would go'],
+];
+const MEASURE_FIELDS = HEIGHT_FIELDS.map(f => f[0]);
+
+let edits = {};
+try { edits = JSON.parse(localStorage.getItem(LS_KEY) || '{}') || {}; } catch (e) { edits = {}; }
+
+function pole(id) { const s = SEED.find(p => p.id === id); return Object.assign({}, s, edits[id] || {}); }
+function allPoles() { return SEED.map(s => Object.assign({}, s, edits[s.id] || {})); }
+function isDone(p) { return MEASURE_FIELDS.some(f => (p[f] || '').trim() !== ''); }
+function isReplace(p) { return /^y/i.test(p.replace || ''); }
+function saveLocal() { try { localStorage.setItem(LS_KEY, JSON.stringify(edits)); } catch (e) { toast('Could not save on this phone: storage is full or blocked'); } }
+
+/* Heights are stored as text exactly like the sheet: 28' 4"  /  18'  /  N/A */
+function parseHeight(str) {
+  const v = (str || '').trim();
+  if (!v) return { na: false, ft: '', in: '' };
+  if (/^n\s*\/?\s*a$/i.test(v)) return { na: true, ft: '', in: '' };
+  const ft = v.match(/(\d+(?:\.\d+)?)\s*(?:'|ft|’)/i);
+  const inch = v.match(/(\d+(?:\.\d+)?)\s*(?:"|in|”|'')/i);
+  if (ft || inch) return { na: false, ft: ft ? ft[1] : '', in: inch ? inch[1] : '' };
+  const n = v.match(/^(\d+(?:\.\d+)?)$/);           // a bare number = feet
+  return { na: false, ft: n ? n[1] : '', in: '', raw: n ? undefined : v };
+}
+function formatHeight(h) {
+  if (h.na) return 'N/A';
+  const ft = String(h.ft ?? '').trim(), inch = String(h.in ?? '').trim();
+  if (!ft && !inch) return h.raw || '';
+  return (ft ? ft + "'" : '') + (ft && inch ? ' ' : '') + (inch ? inch + '"' : '');
+}
+
+/* =========================================================
+   Server sync (optional). Works fine without a server.
+   ========================================================= */
+const sync = { available: false, pending: new Set() };
+async function loadFromServer() {
+  try {
+    const r = await fetch('api/poles', { cache: 'no-store' });
+    if (!r.ok) throw new Error(r.status);
+    const remote = await r.json();
+    let changed = false;
+    for (const id in remote) {
+      const l = edits[id], s = remote[id];
+      if (!l || (s.updatedAt || 0) > (l.updatedAt || 0)) { edits[id] = s; changed = true; }
+      else if ((l.updatedAt || 0) > (s.updatedAt || 0)) sync.pending.add(Number(id));
+    }
+    for (const id in edits) if (!remote[id]) sync.pending.add(Number(id));
+    sync.available = true;
+    if (changed) { saveLocal(); refreshAll(); }
+    flushPending();
+  } catch (e) { sync.available = false; }
+  updateSyncPill();
+}
+async function pushToServer(id) {
+  if (!sync.available) { sync.pending.add(id); updateSyncPill(); return; }
+  try {
+    const r = await fetch('api/poles/' + id, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(edits[id]) });
+    if (!r.ok) throw new Error(r.status);
+    sync.pending.delete(id);
+  } catch (e) { sync.pending.add(id); }
+  updateSyncPill();
+}
+async function flushPending() { for (const id of Array.from(sync.pending)) await pushToServer(id); }
+function updateSyncPill() {
+  const el = document.getElementById('syncPill');
+  if (!sync.available) { el.className = 'sync local'; el.textContent = 'Saved on this phone'; }
+  else if (sync.pending.size) { el.className = 'sync pending'; el.textContent = sync.pending.size + ' waiting to sync'; }
+  else { el.className = 'sync ok'; el.textContent = 'Synced'; }
+}
+window.addEventListener('online', loadFromServer);
+setInterval(loadFromServer, 60000);
+
+/* =========================================================
+   Views
+   ========================================================= */
+function showView(name) {
+  document.getElementById('viewMap').classList.toggle('active', name === 'map');
+  document.getElementById('viewList').classList.toggle('active', name === 'list');
+  document.getElementById('tabMap').setAttribute('aria-pressed', name === 'map');
+  document.getElementById('tabList').setAttribute('aria-pressed', name === 'list');
+  if (name === 'map') setTimeout(() => map.invalidateSize(), 50); else renderTable();
+  try { localStorage.setItem('wm6-view', name); } catch (e) {}
+}
+function refreshProgress() {
+  const all = allPoles(), done = all.filter(isDone).length;
+  document.getElementById('progText').textContent = done + ' of ' + all.length + ' measured';
+  document.getElementById('progBar').style.width = (all.length ? 100 * done / all.length : 0) + '%';
+}
+function refreshAll() { refreshProgress(); refreshMarkers(); if (document.getElementById('viewList').classList.contains('active')) renderTable(); }
+
+/* ---------- Map ---------- */
+const map = L.map('map', { zoomControl: false, tapTolerance: 20 });
+L.control.zoom({ position: 'topright' }).addTo(map);
+const streets = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' });
+const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Imagery &copy; Esri' });
+streets.addTo(map);
+const renderer = L.canvas({ tolerance: 12 });
+const markers = {};
+function markerStyle(p, selected) {
+  const rep = isReplace(p), done = isDone(p);
+  return { radius: selected ? 11 : 8, weight: 2, color: rep ? '#c8322b' : '#3a3a3a', fillColor: rep ? '#c8322b' : done ? '#f68b1d' : '#ffffff', fillOpacity: 1, renderer };
+}
+let selectedId = null;
+SEED.forEach(s => {
+  const p = pole(s.id);
+  const m = L.circleMarker([p.lat, p.lng], markerStyle(p, false)).addTo(map);
+  m.bindTooltip(p.pole || '?', { permanent: true, direction: 'right', offset: [8, 0], className: 'pole-label' });
+  m.on('click', () => openSheet(s.id));
+  markers[s.id] = m;
+});
+if (SEED.length) map.fitBounds(L.latLngBounds(SEED.map(p => [p.lat, p.lng])).pad(0.05));
+function refreshMarkers() {
+  SEED.forEach(s => { const p = pole(s.id); const m = markers[s.id]; m.setStyle(markerStyle(p, s.id === selectedId)); m.setLatLng([p.lat, p.lng]); m.setTooltipContent(p.pole || '?'); });
+}
+function updateLabels() { document.getElementById('map').classList.toggle('hide-labels', map.getZoom() < 16); }
+map.on('zoomend', updateLabels); updateLabels();
+
+let satOn = false;
+function toggleSatellite() {
+  satOn = !satOn;
+  if (satOn) { map.removeLayer(streets); satellite.addTo(map); } else { map.removeLayer(satellite); streets.addTo(map); }
+  document.getElementById('btnSat').setAttribute('aria-pressed', satOn);
+}
+
+/* Geolocation */
+let me = null, meMarker = null, meCircle = null, watching = false;
+function startWatch() {
+  if (watching || !navigator.geolocation) return;
+  watching = true;
+  navigator.geolocation.watchPosition(pos => {
+    me = { lat: pos.coords.latitude, lng: pos.coords.longitude, acc: pos.coords.accuracy };
+    if (!meMarker) {
+      meMarker = L.marker([me.lat, me.lng], { icon: L.divIcon({ className: 'me-dot', iconSize: [16, 16] }), interactive: false, zIndexOffset: 1000 }).addTo(map);
+      meCircle = L.circle([me.lat, me.lng], { radius: me.acc, weight: 1, color: '#2a7fd4', fillOpacity: .08, interactive: false }).addTo(map);
+    } else { meMarker.setLatLng([me.lat, me.lng]); meCircle.setLatLng([me.lat, me.lng]).setRadius(me.acc); }
+    if (selectedId) updateDistance();
+  }, err => { toast(err.code === 1 ? 'Location is blocked. Allow location for this site in your phone settings.' : 'Could not get your location yet'); watching = false; }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 });
+}
+function locateMe() {
+  startWatch();
+  if (me) map.flyTo([me.lat, me.lng], Math.max(map.getZoom(), 17));
+  else toast('Finding your location…');
+}
+function dist(a, b) {  // metres, haversine
+  const R = 6371000, toR = x => x * Math.PI / 180;
+  const dLat = toR(b.lat - a.lat), dLng = toR(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toR(a.lat)) * Math.cos(toR(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+function fmtDist(m) { const ft = m * 3.28084; return ft < 1000 ? Math.round(ft) + ' ft away' : (ft / 5280).toFixed(1) + ' mi away'; }
+function goNearest() {
+  startWatch();
+  if (!me) { toast('Finding your location…'); return; }
+  const todo = allPoles().filter(p => !isDone(p));
+  if (!todo.length) { toast('Every pole is measured'); return; }
+  const best = todo.reduce((a, p) => { const d = dist(me, p); return d < a.d ? { p, d } : a; }, { p: null, d: Infinity });
+  map.flyTo([best.p.lat, best.p.lng], Math.max(map.getZoom(), 18));
+  openSheet(best.p.id);
+}
+
+/* ---------- Sheet (pole form) ---------- */
+const heightsEl = document.getElementById('heights');
+heightsEl.innerHTML = HEIGHT_FIELDS.map(([key, label, hint]) => `
+  <div class="hrow">
+    <label for="ft-${key}">${label}${hint ? `<small>${hint}</small>` : ''}</label>
+    <div class="hgt" data-key="${key}">
+      <input id="ft-${key}" inputmode="decimal" placeholder="0" aria-label="${label} feet"><span class="unit">′</span>
+      <input id="in-${key}" inputmode="decimal" placeholder="0" aria-label="${label} inches"><span class="unit">″</span>
+      <button type="button" class="na" aria-pressed="false" onclick="toggleNA('${key}')">N/A</button>
+    </div>
+  </div>`).join('');
+// after two digits of feet, jump to the inches box
+heightsEl.querySelectorAll('input[id^="ft-"]').forEach(inp => inp.addEventListener('input', e => {
+  if (e.target.value.length === 2 && /^\d\d$/.test(e.target.value)) e.target.parentElement.querySelector('input[id^="in-"]').focus();
+}));
+
+function toggleNA(key) {
+  const row = heightsEl.querySelector(`.hgt[data-key="${key}"]`);
+  const btn = row.querySelector('.na'), on = btn.getAttribute('aria-pressed') !== 'true';
+  btn.setAttribute('aria-pressed', on);
+  row.querySelectorAll('input').forEach(i => { i.disabled = on; if (on) i.value = ''; });
+  row.dataset.raw = '';
+}
+function setHeightRow(key, str) {
+  const h = parseHeight(str), row = heightsEl.querySelector(`.hgt[data-key="${key}"]`);
+  row.querySelector('.na').setAttribute('aria-pressed', h.na);
+  const [ft, inch] = row.querySelectorAll('input');
+  ft.disabled = inch.disabled = h.na; ft.value = h.ft; inch.value = h.in;
+  row.dataset.raw = h.raw || '';
+}
+function getHeightRow(key) {
+  const row = heightsEl.querySelector(`.hgt[data-key="${key}"]`);
+  const [ft, inch] = row.querySelectorAll('input');
+  return formatHeight({ na: row.querySelector('.na').getAttribute('aria-pressed') === 'true', ft: ft.value, in: inch.value, raw: row.dataset.raw });
+}
+let replaceVal = '';
+function setReplace(v) {
+  replaceVal = (replaceVal === v) ? '' : v;
+  document.querySelectorAll('#segReplace button').forEach(b => b.setAttribute('aria-pressed', replaceVal !== '' && b.dataset.val === replaceVal));
+}
+let sheetCoords = null;
+function openSheet(id) {
+  const p = pole(id);
+  selectedId = id; refreshMarkers();
+  document.getElementById('sheetTitle').innerHTML = 'Pole ' + esc(p.pole || '?') + (p.address ? '<small>' + esc(p.address) + '</small>' : '');
+  updateDistance();
+  HEIGHT_FIELDS.forEach(([k]) => setHeightRow(k, p[k]));
+  replaceVal = ''; setReplace(isReplace(p) ? 'Yes' : /^n/i.test(p.replace || '') ? 'No' : '');
+  const sel = document.getElementById('fMaterial');
+  if (p.material && ![...sel.options].some(o => o.value === p.material)) sel.add(new Option(p.material, p.material));
+  sel.value = p.material || '';
+  document.getElementById('fSection').value = p.section || '';
+  document.getElementById('fPole').value = p.pole || '';
+  document.getElementById('fAddress').value = p.address || '';
+  sheetCoords = { lat: p.lat, lng: p.lng }; renderCoords();
+  const e = edits[id];
+  document.getElementById('savedAt').textContent = e && e.updatedAt ? 'Saved ' + new Date(e.updatedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : (isDone(p) ? 'From the original sheet' : 'Not yet measured');
+  document.getElementById('sheet').classList.add('show');
+  document.getElementById('scrim').classList.add('show');
+  document.querySelector('.sheet-body').scrollTop = 0;
+  if (document.getElementById('viewMap').classList.contains('active') && window.innerWidth < 900) {
+    const pt = map.latLngToContainerPoint([p.lat, p.lng]), size = map.getSize();
+    if (pt.y > size.y * 0.3) map.panBy([0, pt.y - size.y * 0.2]);
+  }
+}
+function updateDistance() {
+  if (!selectedId) return;
+  const p = pole(selectedId);
+  const nav = `<a href="https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}" target="_blank" rel="noopener">Directions</a>`;
+  document.getElementById('sheetSub').innerHTML = (p.material ? '<span>' + esc(p.material) + '</span>' : '') + (me ? '<span>' + fmtDist(dist(me, p)) + '</span>' : '') + nav;
+}
+function renderCoords() { document.getElementById('fCoords').textContent = sheetCoords.lat.toFixed(6) + ', ' + sheetCoords.lng.toFixed(6); }
+function useMyLocation() {
+  startWatch();
+  if (!me) { toast('Finding your location…'); return; }
+  if (me.acc > 30 && !confirm('GPS accuracy is only ±' + Math.round(me.acc * 3.28) + ' ft. Use it anyway?')) return;
+  sheetCoords = { lat: +me.lat.toFixed(7), lng: +me.lng.toFixed(7) }; renderCoords(); toast('Coordinates updated. Save to keep them.');
+}
+function closeSheet() {
+  document.getElementById('sheet').classList.remove('show');
+  document.getElementById('scrim').classList.remove('show');
+  selectedId = null; refreshMarkers();
+}
+function savePole() {
+  if (!selectedId) return;
+  const id = selectedId, prev = pole(id), rec = {};
+  HEIGHT_FIELDS.forEach(([k]) => rec[k] = getHeightRow(k));
+  rec.replace = replaceVal;
+  rec.material = document.getElementById('fMaterial').value;
+  rec.section = document.getElementById('fSection').value.trim();
+  rec.pole = document.getElementById('fPole').value.trim();
+  rec.address = document.getElementById('fAddress').value.trim();
+  rec.lat = sheetCoords.lat; rec.lng = sheetCoords.lng;
+  rec.updatedAt = Date.now();
+  edits[id] = rec;
+  saveLocal(); pushToServer(id);
+  closeSheet(); refreshAll();
+  toast('Saved pole ' + (rec.pole || prev.pole));
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && selectedId) closeSheet(); });
+
+/* ---------- Info table ---------- */
+let filter = 'all';
+function setFilter(f) { filter = f; document.querySelectorAll('.chips button').forEach(b => b.setAttribute('aria-pressed', b.dataset.filter === f)); renderTable(); }
+function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+function renderTable() {
+  const q = document.getElementById('search').value.trim().toLowerCase();
+  const rows = allPoles().filter(p => {
+    if (filter === 'todo' && isDone(p)) return false;
+    if (filter === 'done' && !isDone(p)) return false;
+    return !q || (p.pole || '').toLowerCase().includes(q) || (p.address || '').toLowerCase().includes(q);
+  });
+  const cell = v => v ? esc(v) : '<span class="muted">—</span>';
+  document.getElementById('tbody').innerHTML = rows.map(p => `
+    <tr data-id="${p.id}" class="${isDone(p) ? 'done' : ''} ${isReplace(p) ? 'replace' : ''}" onclick="openSheet(${p.id})">
+      <td>${esc(p.pole)}</td><td class="status"><i title="${isDone(p) ? 'Measured' : 'To do'}"></i></td><td>${cell(p.address)}</td>
+      <td>${cell(p.power)}</td><td>${cell(p.catv)}</td><td>${cell(p.phone)}</td><td>${cell(p.other)}</td>
+      <td>${cell(p.crossing)}</td><td>${cell(p.proposed)}</td><td>${cell(p.replace)}</td><td>${cell(p.material)}</td>
+      <td class="muted">${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}</td><td>${cell(p.section)}</td>
+    </tr>`).join('');
+  document.getElementById('empty').hidden = rows.length > 0;
+}
+
+/* ---------- Export: same columns as the original sheet ---------- */
+function exportSheet() {
+  const header = ['Pole #', 'Address', 'Power Height', 'CATV Height', 'Phone Height', 'Other Height', 'Road / Street Crossing Height', 'Proposed Attachment Height', 'SUGGEST REPLACE', 'Material', 'Coords', 'Section'];
+  const rows = allPoles().map(p => [p.pole, p.address, p.power, p.catv, p.phone, p.other, p.crossing, p.proposed, p.replace, p.material, p.lat + ', ' + p.lng, p.section]);
+  const stamp = new Date().toISOString().slice(0, 10);
+  if (window.XLSX) {
+    const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+    ws['!cols'] = [8, 18, 13, 12, 12, 12, 26, 26, 16, 10, 36, 10].map(w => ({ wch: w }));
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'ALL');
+    XLSX.writeFile(wb, 'WEST MOUNTAIN PHASE 6 POLE MEASUREMENTS ' + stamp + '.xlsx');
+  } else {
+    const csv = [header, ...rows].map(r => r.map(v => '"' + String(v ?? '').replace(/"/g, '""') + '"').join(',')).join('\r\n');
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = 'WEST MOUNTAIN PHASE 6 POLE MEASUREMENTS ' + stamp + '.csv'; a.click();
+  }
+  toast('Sheet exported');
+}
+
+/* ---------- Toast ---------- */
+let toastTimer;
+function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2600); }
+
+/* ---------- Boot ---------- */
+refreshProgress();
+loadFromServer();
+let startView = 'map'; try { startView = localStorage.getItem('wm6-view') || 'map'; } catch (e) {}
+if (startView === 'list') showView('list');
+</script>
+</body>
+</html>
