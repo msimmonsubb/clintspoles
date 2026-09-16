@@ -98,6 +98,29 @@
   .pole-label::before { display: none; }
   .leaflet-control-attribution { font-size: 10px; }
   .me-dot { background: var(--blue); border: 2px solid #fff; border-radius: 50%; box-shadow: 0 0 0 2px rgba(42,127,212,.4); }
+  .map-tools button.share[aria-pressed="true"] { background: var(--blue); border-color: var(--blue); }
+  .map-tools button.share[aria-pressed="true"] svg { stroke: #fff; }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(42,127,212,.5); } 100% { box-shadow: 0 0 0 12px rgba(42,127,212,0); } }
+  .map-tools button.share[aria-pressed="true"] { animation: pulse 2s infinite; }
+
+  /* other people sharing their location */
+  .person-icon { background: none; border: 0; }
+  .person { position: relative; display: block; width: 0; height: 0; }
+  .person i { position: absolute; left: -9px; top: -9px; width: 18px; height: 18px; border-radius: 50%; background: var(--blue); border: 3px solid #fff; box-shadow: 0 0 0 2px rgba(42,127,212,.5), 0 2px 6px rgba(0,0,0,.3); }
+  .person b { position: absolute; left: 12px; top: -12px; white-space: nowrap; background: var(--blue); color: #fff; font: 600 12px var(--font); padding: 2px 7px; border-radius: 999px; box-shadow: 0 1px 4px rgba(0,0,0,.25); }
+  .person b small { font-weight: 400; opacity: .85; margin-left: 4px; }
+  .person.stale i { background: #9a9a9a; box-shadow: 0 2px 6px rgba(0,0,0,.3); }
+  .person.stale b { background: #9a9a9a; }
+
+  /* name prompt for location sharing */
+  dialog { border: 0; border-radius: 14px; padding: 20px; width: min(92vw, 360px); box-shadow: 0 8px 32px rgba(0,0,0,.3); color: var(--ink); font-family: var(--font); }
+  dialog::backdrop { background: rgba(58,58,58,.45); }
+  dialog h3 { margin: 0 0 4px; font-family: var(--font-display); font-size: 22px; }
+  dialog p { margin: 0 0 12px; color: var(--ink-soft); font-size: 14px; line-height: 1.4; }
+  dialog input { width: 100%; height: 46px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); padding: 0 12px; font-size: 16px; }
+  dialog .row { display: flex; gap: 10px; margin-top: 14px; }
+  dialog .row button { flex: 1; height: 46px; border: 0; border-radius: 8px; font-weight: 700; font-size: 15px; background: var(--field); }
+  dialog .row button.primary { background: var(--orange); }
 
   /* List */
   .list-bar { display: flex; gap: 8px; padding: 10px 16px; background: var(--paper); border-bottom: 1px solid var(--line); align-items: center; flex-wrap: wrap; }
@@ -233,6 +256,9 @@
     <div id="map"></div>
     <div class="legend" aria-hidden="true"><span>To do</span><span class="done">Measured</span><span class="replace">Replace</span></div>
     <div class="map-tools">
+      <button id="btnShare" class="share" aria-pressed="false" title="Share my location with the office" onclick="toggleShare()" hidden>
+        <svg viewBox="0 0 24 24"><path d="M5 12a7 7 0 0 1 14 0"/><path d="M8.5 12a3.5 3.5 0 0 1 7 0"/><circle cx="12" cy="12" r="1"/><path d="M12 13v8"/></svg>
+      </button>
       <button id="btnSat" aria-pressed="false" title="Satellite view" onclick="toggleSatellite()">
         <svg viewBox="0 0 24 24"><path d="M3 9l9-5 9 5-9 5-9-5z"/><path d="M3 14l9 5 9-5"/></svg>
       </button>
@@ -312,6 +338,18 @@
 </div>
 <div class="toast" id="toast" role="status"></div>
 
+<dialog id="nameDlg">
+  <form method="dialog" onsubmit="startShareWithName()">
+    <h3>Share your location</h3>
+    <p>Your position is sent to the office map every few seconds while this page is open. Only your name is shown. Switch it off any time with the same button.</p>
+    <input type="text" id="shareName" placeholder="Your name" autocomplete="name" maxlength="40" required>
+    <div class="row">
+      <button type="button" onclick="document.getElementById('nameDlg').close()">Not now</button>
+      <button type="submit" class="primary">Start sharing</button>
+    </div>
+  </form>
+</dialog>
+
 <script src="data.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
@@ -377,7 +415,9 @@ async function loadFromServer() {
       else if ((l.updatedAt || 0) > (s.updatedAt || 0)) sync.pending.add(Number(id));
     }
     for (const id in edits) if (!remote[id]) sync.pending.add(Number(id));
+    const firstContact = !sync.available;
     sync.available = true;
+    if (firstContact) { pollLocations(); if (share.on && share.name) setShare(true); }
     if (changed) { saveLocal(); refreshAll(); }
     flushPending();
   } catch (e) { sync.available = false; }
@@ -395,6 +435,7 @@ async function pushToServer(id) {
 async function flushPending() { for (const id of Array.from(sync.pending)) await pushToServer(id); }
 function updateSyncPill() {
   const el = document.getElementById('syncPill');
+  document.getElementById('btnShare').hidden = !sync.available;
   if (!sync.available) { el.className = 'sync local'; el.textContent = 'Saved on this phone'; }
   else if (sync.pending.size) { el.className = 'sync pending'; el.textContent = sync.pending.size + ' waiting to sync'; }
   else { el.className = 'sync ok'; el.textContent = 'Synced'; }
@@ -466,6 +507,7 @@ function startWatch() {
       meCircle = L.circle([me.lat, me.lng], { radius: me.acc, weight: 1, color: '#2a7fd4', fillOpacity: .08, interactive: false }).addTo(map);
     } else { meMarker.setLatLng([me.lat, me.lng]); meCircle.setLatLng([me.lat, me.lng]).setRadius(me.acc); }
     if (selectedId) updateDistance();
+    if (share.on) sendLocation();
   }, err => { toast(err.code === 1 ? 'Location is blocked. Allow location for this site in your phone settings.' : 'Could not get your location yet'); watching = false; }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 });
 }
 function locateMe() {
@@ -489,6 +531,79 @@ function goNearest() {
   map.flyTo([best.p.lat, best.p.lng], Math.max(map.getZoom(), 18));
   openSheet(best.p.id);
 }
+
+/* ---------- Live location sharing (needs the server) ---------- */
+const share = { on: false, name: '', lastSent: 0, lastPos: null, timer: null, wake: null };
+try { share.name = localStorage.getItem('wm6-name') || ''; share.on = localStorage.getItem('wm6-share') === '1'; } catch (e) {}
+function toggleShare() {
+  if (!sync.available) { toast('Location sharing needs the server connection'); return; }
+  if (share.on) { setShare(false); toast('Location sharing off'); return; }
+  if (!share.name) { document.getElementById('shareName').value = ''; document.getElementById('nameDlg').showModal(); return; }
+  setShare(true);
+}
+function startShareWithName() {
+  const n = document.getElementById('shareName').value.trim();
+  if (!n) return;
+  share.name = n; try { localStorage.setItem('wm6-name', n); } catch (e) {}
+  setShare(true);
+}
+function setShare(on) {
+  share.on = on; try { localStorage.setItem('wm6-share', on ? '1' : '0'); } catch (e) {}
+  document.getElementById('btnShare').setAttribute('aria-pressed', on);
+  clearInterval(share.timer); share.timer = null;
+  if (on) {
+    startWatch(); share.lastSent = 0; sendLocation();
+    share.timer = setInterval(sendLocation, 10000);
+    requestWake();
+    toast('Sharing location as ' + share.name);
+  } else releaseWake();
+}
+async function sendLocation() {
+  if (!share.on || !me || !sync.available) return;
+  const now = Date.now();
+  const moved = !share.lastPos || dist(share.lastPos, me) > 3;
+  if (!moved && now - share.lastSent < 30000) return;
+  try {
+    const r = await fetch('api/location', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: share.name, lat: me.lat, lng: me.lng, acc: Math.round(me.acc) }) });
+    if (r.ok) { share.lastSent = now; share.lastPos = { lat: me.lat, lng: me.lng }; }
+  } catch (e) {}
+}
+// keep the screen awake while sharing so the GPS keeps flowing (supported on Android Chrome and recent iOS Safari)
+async function requestWake() { try { if (navigator.wakeLock && !share.wake) share.wake = await navigator.wakeLock.request('screen'); } catch (e) {} }
+function releaseWake() { try { share.wake && share.wake.release(); } catch (e) {} share.wake = null; }
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && share.on) { share.wake = null; requestWake(); sendLocation(); } });
+
+/* other people on the map */
+const people = {}; let trailLine = null, trailName = null;
+function ago(ts) { const s = Math.round((Date.now() - ts) / 1000); return s < 60 ? 'just now' : s < 3600 ? Math.round(s / 60) + ' min ago' : Math.round(s / 3600) + ' h ago'; }
+function personIcon(l) {
+  const stale = Date.now() - l.ts > 5 * 60000;
+  return L.divIcon({ className: 'person-icon', iconSize: [0, 0], html: `<span class="person${stale ? ' stale' : ''}"><i></i><b>${esc(l.name)}<small>${ago(l.ts)}</small></b></span>` });
+}
+async function pollLocations() {
+  if (!sync.available) return;
+  let list = [];
+  try { const r = await fetch('api/locations', { cache: 'no-store' }); if (!r.ok) return; list = await r.json(); } catch (e) { return; }
+  const seen = new Set();
+  list.forEach(l => {
+    if (share.on && l.name === share.name) return;   // the phone already shows itself as the blue dot
+    seen.add(l.name);
+    if (people[l.name]) people[l.name].setLatLng([l.lat, l.lng]).setIcon(personIcon(l));
+    else people[l.name] = L.marker([l.lat, l.lng], { icon: personIcon(l), zIndexOffset: 900 }).addTo(map).on('click', () => toggleTrail(l.name));
+  });
+  Object.keys(people).forEach(n => { if (!seen.has(n)) { map.removeLayer(people[n]); delete people[n]; } });
+}
+async function toggleTrail(name) {
+  if (trailLine) { map.removeLayer(trailLine); trailLine = null; if (trailName === name) { trailName = null; return; } }
+  trailName = name;
+  try {
+    const pts = await (await fetch('api/track?name=' + encodeURIComponent(name), { cache: 'no-store' })).json();
+    if (pts.length < 2) { toast('No trail for ' + name + ' yet today'); return; }
+    trailLine = L.polyline(pts.map(p => [p[0], p[1]]), { color: '#2a7fd4', weight: 3, opacity: .75, dashArray: '2 6' }).addTo(map);
+    toast(name + ' today: ' + pts.length + ' points. Tap the dot again to hide.');
+  } catch (e) {}
+}
+setInterval(pollLocations, 15000);
 
 /* ---------- Sheet (pole form) ---------- */
 const heightsEl = document.getElementById('heights');

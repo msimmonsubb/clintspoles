@@ -14,9 +14,56 @@ enter the heights, and shows the whole sheet in an Info view. No login.
 | `server.js` | Optional. Tiny Node server that saves measurements centrally |
 | `data/edits.json` | Created by `server.js`. Every saved pole lives here |
 
-## Two ways to host it
+## Hosting on your own server with a free Cloudflare URL (recommended)
 
-### Option A – with the server (recommended)
+This gives you a public https address, no port forwarding, and every measurement and
+the tech's live location saved on your machine.
+
+1. Install Node.js (https://nodejs.org) and cloudflared:
+   - Windows: `winget install Cloudflare.cloudflared`
+   - Linux: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/
+2. Get the files onto the server:
+
+   ```
+   git clone https://github.com/msimmonsubb/clintspoles.git
+   cd clintspoles
+   ```
+
+3. Start everything:
+   - Windows: `powershell -ExecutionPolicy Bypass -File .\start-tunnel.ps1`
+   - Linux/macOS: `chmod +x start-tunnel.sh && ./start-tunnel.sh`
+
+   It prints `Pole site is live at: https://xxxx-xxxx.trycloudflare.com` and saves the same
+   address to `tunnel-url.txt`. Send that link to the tech.
+
+4. Leave the window open. Closing it (or Ctrl+C) stops the site.
+
+The free trycloudflare.com address is different every time the script starts, so restart
+it as rarely as you can and re-send the link when you do. Cloudflare gives no uptime
+promise on free quick tunnels. If you ever want a permanent address, add a domain to
+Cloudflare and create a named tunnel instead; the site itself needs no changes.
+
+To update the site after a change on GitHub: stop the script, run `git pull`, start it again.
+
+### Live location
+
+When the site is served by `server.js`, an extra antenna button appears on the map.
+The tech taps it once, enters his name, and his position is sent to the server every
+few seconds while the page is open. Everyone else looking at the map sees a blue dot
+with his name and how long ago it was updated (grey after 5 minutes without an update).
+Tapping the dot shows his trail for today. The same button switches sharing off, and
+the choice is remembered on the phone.
+
+Phones stop sending GPS from a browser tab once the screen locks or another app is in
+front, so the dot updates while the page is up and pauses in between. While sharing is
+on, the page asks the phone to keep the screen awake to help with that.
+
+Location data is stored in `data/locations.json` (latest position per person) and
+`data/track-YYYY-MM-DD.jsonl` (one line per report).
+
+## Other ways to host it
+
+### Option A – server on your local network only
 
 Everything the tech saves on the phone is sent to the server, so you can watch progress
 from your own computer and download the finished sheet at any time.

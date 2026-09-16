@@ -10,6 +10,9 @@
 //   PUT  /api/poles/:id    save one pole (JSON body)
 //   GET  /api/export.csv   full sheet (seed data + edits) as CSV
 //   GET  /api/export.json  full sheet as JSON
+//   POST /api/location     phone reports its GPS position {name, lat, lng, acc}
+//   GET  /api/locations    latest position of everyone sharing (last 12 h)
+//   GET  /api/track?name=X&date=YYYY-MM-DD   that person's breadcrumb trail for a day
 
 const http = require('http');
 const fs = require('fs');
@@ -41,6 +44,38 @@ function persist() {
     fs.writeFileSync(tmp, JSON.stringify(edits, null, 1));
     fs.renameSync(tmp, EDITS_FILE);
   }, 200);
+}
+
+/* ---- live locations ---- */
+const LOC_FILE = path.join(DATA_DIR, 'locations.json');
+let locations = {};
+try { locations = JSON.parse(fs.readFileSync(LOC_FILE, 'utf8')); } catch (e) { locations = {}; }
+let locWriteQueued = false;
+function persistLocations() {
+  if (locWriteQueued) return;
+  locWriteQueued = true;
+  setTimeout(() => { locWriteQueued = false; fs.writeFileSync(LOC_FILE, JSON.stringify(locations, null, 1)); }, 1000);
+}
+function localDate(ts) { const d = new Date(ts); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function safeName(n) { return String(n || '').trim().slice(0, 40).replace(/[^\w .'-]/g, ''); }
+function recordLocation(body) {
+  const name = safeName(body.name), lat = Number(body.lat), lng = Number(body.lng);
+  if (!name || !isFinite(lat) || !isFinite(lng)) return null;
+  const rec = { name, lat, lng, acc: Number(body.acc) || null, ts: Date.now() };
+  locations[name] = rec;
+  persistLocations();
+  // breadcrumb trail, one JSON line per report, per day
+  fs.appendFile(path.join(DATA_DIR, `track-${localDate(rec.ts)}.jsonl`), JSON.stringify(rec) + '\n', () => {});
+  return rec;
+}
+function readTrack(name, date) {
+  name = safeName(name); date = /^\d{4}-\d{2}-\d{2}$/.test(date || '') ? date : localDate(Date.now());
+  let text = '';
+  try { text = fs.readFileSync(path.join(DATA_DIR, `track-${date}.jsonl`), 'utf8'); } catch (e) { return []; }
+  return text.split('\n').filter(Boolean)
+    .map(l => { try { return JSON.parse(l); } catch (e) { return null; } })
+    .filter(r => r && (!name || r.name === name))
+    .map(r => [r.lat, r.lng, r.ts]);
 }
 
 const HEADER = ['Pole #', 'Address', 'Power Height', 'CATV Height', 'Phone Height', 'Other Height', 'Road / Street Crossing Height', 'Proposed Attachment Height', 'SUGGEST REPLACE', 'Material', 'Coords', 'Section'];
@@ -84,6 +119,15 @@ http.createServer(async (req, res) => {
       return res.end('﻿' + toCsv());
     }
     if (p === '/api/export.json') return send(res, 200, JSON.stringify(merged(), null, 1));
+    if (p === '/api/location' && req.method === 'POST') {
+      const rec = recordLocation(JSON.parse(await readBody(req) || '{}'));
+      return rec ? send(res, 200, JSON.stringify(rec)) : send(res, 400, '{"error":"need name, lat, lng"}');
+    }
+    if (p === '/api/locations') {
+      const cutoff = Date.now() - 12 * 3600 * 1000;
+      return send(res, 200, JSON.stringify(Object.values(locations).filter(l => l.ts > cutoff)));
+    }
+    if (p === '/api/track') return send(res, 200, JSON.stringify(readTrack(url.searchParams.get('name'), url.searchParams.get('date'))));
     if (p.startsWith('/api/')) return send(res, 404, '{"error":"not found"}');
 
     // static files

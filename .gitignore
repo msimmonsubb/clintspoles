@@ -1,4 +1,6 @@
 data/
 *.tmp
+tunnel.log
+tunnel-url.txt
 .DS_Store
 Thumbs.db
