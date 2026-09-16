@@ -47,12 +47,16 @@ To update the site after a change on GitHub: stop the script, run `git pull`, st
 
 ### Live location
 
-When the site is served by `server.js`, an extra antenna button appears on the map.
-The tech taps it once, enters his name, and his position is sent to the server every
-few seconds while the page is open. Everyone else looking at the map sees a blue dot
-with his name and how long ago it was updated (grey after 5 minutes without an update).
-Tapping the dot shows his trail for today. The same button switches sharing off, and
-the choice is remembered on the phone.
+When the site is served by `server.js`, the page asks the browser for location
+permission on load. Once the tech allows it, the page asks his name one time and then
+sends his position to the server every few seconds while the page is open. Everyone
+else looking at the map sees a blue dot with his name and how long ago it was updated
+(grey after 5 minutes without an update). Tapping the dot shows his trail for today.
+
+There is no on/off switch. To stop being tracked, revoke location permission for the
+site in the phone's browser settings, or close the page. Anyone else who opens the site
+and allows location (for example on an office PC) will show up as a dot too, under
+whatever name they enter.
 
 Phones stop sending GPS from a browser tab once the screen locks or another app is in
 front, so the dot updates while the page is up and pauses in between. While sharing is

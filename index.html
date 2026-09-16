@@ -98,10 +98,6 @@
   .pole-label::before { display: none; }
   .leaflet-control-attribution { font-size: 10px; }
   .me-dot { background: var(--blue); border: 2px solid #fff; border-radius: 50%; box-shadow: 0 0 0 2px rgba(42,127,212,.4); }
-  .map-tools button.share[aria-pressed="true"] { background: var(--blue); border-color: var(--blue); }
-  .map-tools button.share[aria-pressed="true"] svg { stroke: #fff; }
-  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(42,127,212,.5); } 100% { box-shadow: 0 0 0 12px rgba(42,127,212,0); } }
-  .map-tools button.share[aria-pressed="true"] { animation: pulse 2s infinite; }
 
   /* other people sharing their location */
   .person-icon { background: none; border: 0; }
@@ -256,9 +252,6 @@
     <div id="map"></div>
     <div class="legend" aria-hidden="true"><span>To do</span><span class="done">Measured</span><span class="replace">Replace</span></div>
     <div class="map-tools">
-      <button id="btnShare" class="share" aria-pressed="false" title="Share my location with the office" onclick="toggleShare()" hidden>
-        <svg viewBox="0 0 24 24"><path d="M5 12a7 7 0 0 1 14 0"/><path d="M8.5 12a3.5 3.5 0 0 1 7 0"/><circle cx="12" cy="12" r="1"/><path d="M12 13v8"/></svg>
-      </button>
       <button id="btnSat" aria-pressed="false" title="Satellite view" onclick="toggleSatellite()">
         <svg viewBox="0 0 24 24"><path d="M3 9l9-5 9 5-9 5-9-5z"/><path d="M3 14l9 5 9-5"/></svg>
       </button>
@@ -340,12 +333,11 @@
 
 <dialog id="nameDlg">
   <form method="dialog" onsubmit="startShareWithName()">
-    <h3>Share your location</h3>
-    <p>Your position is sent to the office map every few seconds while this page is open. Only your name is shown. Switch it off any time with the same button.</p>
+    <h3>Who's using this phone?</h3>
+    <p>Your name is shown next to your dot on the office map while this page is open. You'll only be asked once.</p>
     <input type="text" id="shareName" placeholder="Your name" autocomplete="name" maxlength="40" required>
     <div class="row">
-      <button type="button" onclick="document.getElementById('nameDlg').close()">Not now</button>
-      <button type="submit" class="primary">Start sharing</button>
+      <button type="submit" class="primary">Save name</button>
     </div>
   </form>
 </dialog>
@@ -417,7 +409,7 @@ async function loadFromServer() {
     for (const id in edits) if (!remote[id]) sync.pending.add(Number(id));
     const firstContact = !sync.available;
     sync.available = true;
-    if (firstContact) { pollLocations(); if (share.on && share.name) setShare(true); }
+    if (firstContact) { pollLocations(); startWatch(true); if (me) onPosition(); }
     if (changed) { saveLocal(); refreshAll(); }
     flushPending();
   } catch (e) { sync.available = false; }
@@ -435,7 +427,6 @@ async function pushToServer(id) {
 async function flushPending() { for (const id of Array.from(sync.pending)) await pushToServer(id); }
 function updateSyncPill() {
   const el = document.getElementById('syncPill');
-  document.getElementById('btnShare').hidden = !sync.available;
   if (!sync.available) { el.className = 'sync local'; el.textContent = 'Saved on this phone'; }
   else if (sync.pending.size) { el.className = 'sync pending'; el.textContent = sync.pending.size + ' waiting to sync'; }
   else { el.className = 'sync ok'; el.textContent = 'Synced'; }
@@ -497,7 +488,7 @@ function toggleSatellite() {
 
 /* Geolocation */
 let me = null, meMarker = null, meCircle = null, watching = false;
-function startWatch() {
+function startWatch(quiet) {
   if (watching || !navigator.geolocation) return;
   watching = true;
   navigator.geolocation.watchPosition(pos => {
@@ -507,8 +498,8 @@ function startWatch() {
       meCircle = L.circle([me.lat, me.lng], { radius: me.acc, weight: 1, color: '#2a7fd4', fillOpacity: .08, interactive: false }).addTo(map);
     } else { meMarker.setLatLng([me.lat, me.lng]); meCircle.setLatLng([me.lat, me.lng]).setRadius(me.acc); }
     if (selectedId) updateDistance();
-    if (share.on) sendLocation();
-  }, err => { toast(err.code === 1 ? 'Location is blocked. Allow location for this site in your phone settings.' : 'Could not get your location yet'); watching = false; }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 });
+    onPosition();
+  }, err => { if (!quiet) toast(err.code === 1 ? 'Location is blocked. Allow location for this site in your phone settings.' : 'Could not get your location yet'); watching = false; }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 });
 }
 function locateMe() {
   startWatch();
@@ -533,33 +524,30 @@ function goNearest() {
 }
 
 /* ---------- Live location sharing (needs the server) ---------- */
-const share = { on: false, name: '', lastSent: 0, lastPos: null, timer: null, wake: null };
-try { share.name = localStorage.getItem('wm6-name') || ''; share.on = localStorage.getItem('wm6-share') === '1'; } catch (e) {}
-function toggleShare() {
-  if (!sync.available) { toast('Location sharing needs the server connection'); return; }
-  if (share.on) { setShare(false); toast('Location sharing off'); return; }
-  if (!share.name) { document.getElementById('shareName').value = ''; document.getElementById('nameDlg').showModal(); return; }
-  setShare(true);
+// Tracking is automatic: once the browser grants location permission and the server is
+// reachable, the phone reports its position while the page is open. The only question
+// asked is the person's name, once, so the dot on the office map is labelled.
+const share = { name: '', lastSent: 0, lastPos: null, timer: null, wake: null, asked: false };
+try { share.name = localStorage.getItem('wm6-name') || ''; } catch (e) {}
+function sharing() { return sync.available && !!share.name; }
+function onPosition() {
+  if (!sync.available) return;
+  if (!share.name) {
+    if (!share.asked) { share.asked = true; document.getElementById('shareName').value = ''; document.getElementById('nameDlg').showModal(); }
+    return;
+  }
+  if (!share.timer) { share.timer = setInterval(sendLocation, 10000); requestWake(); }
+  sendLocation();
 }
 function startShareWithName() {
   const n = document.getElementById('shareName').value.trim();
   if (!n) return;
   share.name = n; try { localStorage.setItem('wm6-name', n); } catch (e) {}
-  setShare(true);
-}
-function setShare(on) {
-  share.on = on; try { localStorage.setItem('wm6-share', on ? '1' : '0'); } catch (e) {}
-  document.getElementById('btnShare').setAttribute('aria-pressed', on);
-  clearInterval(share.timer); share.timer = null;
-  if (on) {
-    startWatch(); share.lastSent = 0; sendLocation();
-    share.timer = setInterval(sendLocation, 10000);
-    requestWake();
-    toast('Sharing location as ' + share.name);
-  } else releaseWake();
+  toast('Thanks ' + n + ', you now show on the office map');
+  onPosition();
 }
 async function sendLocation() {
-  if (!share.on || !me || !sync.available) return;
+  if (!sharing() || !me) return;
   const now = Date.now();
   const moved = !share.lastPos || dist(share.lastPos, me) > 3;
   if (!moved && now - share.lastSent < 30000) return;
@@ -571,7 +559,7 @@ async function sendLocation() {
 // keep the screen awake while sharing so the GPS keeps flowing (supported on Android Chrome and recent iOS Safari)
 async function requestWake() { try { if (navigator.wakeLock && !share.wake) share.wake = await navigator.wakeLock.request('screen'); } catch (e) {} }
 function releaseWake() { try { share.wake && share.wake.release(); } catch (e) {} share.wake = null; }
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && share.on) { share.wake = null; requestWake(); sendLocation(); } });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && sharing()) { share.wake = null; requestWake(); sendLocation(); } });
 
 /* other people on the map */
 const people = {}; let trailLine = null, trailName = null;
@@ -586,7 +574,7 @@ async function pollLocations() {
   try { const r = await fetch('api/locations', { cache: 'no-store' }); if (!r.ok) return; list = await r.json(); } catch (e) { return; }
   const seen = new Set();
   list.forEach(l => {
-    if (share.on && l.name === share.name) return;   // the phone already shows itself as the blue dot
+    if (sharing() && l.name === share.name) return;   // the phone already shows itself as the blue dot
     seen.add(l.name);
     if (people[l.name]) people[l.name].setLatLng([l.lat, l.lng]).setIcon(personIcon(l));
     else people[l.name] = L.marker([l.lat, l.lng], { icon: personIcon(l), zIndexOffset: 900 }).addTo(map).on('click', () => toggleTrail(l.name));
