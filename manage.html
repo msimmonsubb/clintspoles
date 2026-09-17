@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#3a3a3a">
+<title>Manage pole projects</title>
+<link rel="icon" href="ubb-logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3a3a3a; --ink-soft: #6b6b6b; --orange: #f68b1d; --orange-deep: #b95f05;
+    --paper: #fff; --field: #f3f2ee; --line: #d9d7d1; --replace: #c8322b; --green: #2e9e4f;
+    --radius: 10px;
+    --font: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-display: "Barlow Semi Condensed", "Barlow", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: var(--font); color: var(--ink); background: var(--field); }
+  button, input, select { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  :focus-visible { outline: 3px solid var(--orange); outline-offset: 2px; }
+  a { color: var(--orange-deep); }
+
+  header { background: var(--paper); border-bottom: 3px solid var(--orange); padding: 10px 20px; display: flex; align-items: center; gap: 16px; }
+  header img { height: 40px; }
+  header h1 { margin: 0; font-family: var(--font-display); font-size: 22px; flex: 1; }
+  header a { font-weight: 600; text-decoration: none; }
+
+  main { max-width: 960px; margin: 0 auto; padding: 20px 16px 60px; }
+  .overview { display: flex; gap: 24px; flex-wrap: wrap; color: var(--ink-soft); font-size: 14px; margin-bottom: 18px; }
+  .overview b { color: var(--ink); font-size: 22px; font-family: var(--font-display); margin-right: 4px; }
+
+  .proj { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; margin-bottom: 16px; overflow: hidden; }
+  .proj-head { display: flex; align-items: center; gap: 10px; padding: 12px 16px; flex-wrap: wrap; }
+  .proj-head h2 { margin: 0; font-family: var(--font-display); font-size: 22px; flex: 1; min-width: 160px; }
+  .phase { display: grid; grid-template-columns: 1fr auto; grid-template-areas: "name actions" "bar actions" "meta actions"; gap: 4px 16px; align-items: center; padding: 12px 16px; border-top: 1px solid var(--line); }
+  .phase .name { grid-area: name; font-weight: 600; font-size: 17px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .phase .name a { text-decoration: none; color: inherit; }
+  .phase .name a:hover { color: var(--orange-deep); }
+  .phase .bar { grid-area: bar; height: 6px; background: var(--field); border-radius: 3px; overflow: hidden; max-width: 360px; }
+  .phase .bar i { display: block; height: 100%; background: var(--orange); }
+  .phase.complete .bar i { background: var(--green); }
+  .phase .meta { grid-area: meta; color: var(--ink-soft); font-size: 13px; }
+  .actions { grid-area: actions; display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  .none { padding: 12px 16px; color: var(--ink-soft); border-top: 1px solid var(--line); font-size: 14px; }
+
+  .btn { border: 1px solid var(--line); background: var(--paper); border-radius: 8px; height: 34px; padding: 0 12px; font-weight: 600; font-size: 14px; white-space: nowrap; text-decoration: none; display: inline-flex; align-items: center; color: var(--ink); }
+  .btn:hover { border-color: var(--ink-soft); }
+  .btn.primary { background: var(--orange); border-color: var(--orange); }
+  .btn.danger { color: var(--replace); }
+  .btn.danger.armed { background: var(--replace); border-color: var(--replace); color: #fff; }
+  .btn.big { height: 44px; font-size: 15px; padding: 0 18px; }
+  .btn:disabled { opacity: .5; cursor: default; }
+
+  .inline-edit { display: flex; gap: 6px; align-items: center; flex: 1; min-width: 200px; }
+  .inline-edit input { flex: 1; height: 34px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; background: var(--field); }
+  .newproj { display: flex; gap: 8px; margin-top: 8px; }
+  .newproj input { flex: 1; height: 44px; border: 1px solid var(--line); border-radius: 8px; padding: 0 12px; background: var(--paper); max-width: 360px; }
+  .empty { text-align: center; color: var(--ink-soft); padding: 40px; background: var(--paper); border: 1px dashed var(--line); border-radius: 14px; margin-bottom: 16px; }
+
+  /* import dialog */
+  dialog { border: 0; border-radius: 14px; padding: 0; width: min(96vw, 860px); box-shadow: 0 8px 32px rgba(0,0,0,.3); color: var(--ink); font-family: var(--font); }
+  dialog::backdrop { background: rgba(58,58,58,.45); }
+  .dlg-head { padding: 16px 20px 12px; border-bottom: 1px solid var(--line); display: flex; align-items: center; }
+  .dlg-head h3 { margin: 0; font-family: var(--font-display); font-size: 22px; flex: 1; }
+  .dlg-body { padding: 16px 20px; max-height: 70vh; overflow: auto; }
+  .dlg-foot { padding: 12px 20px; border-top: 1px solid var(--line); display: flex; gap: 10px; justify-content: flex-end; align-items: center; }
+  .dlg-foot .status { flex: 1; font-size: 14px; color: var(--ink-soft); }
+  .dlg-foot .status.err { color: var(--replace); font-weight: 600; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .f { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; min-width: 0; }
+  .f label { font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+  .f input[type=text], .f select { height: 42px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; background: var(--field); width: 100%; }
+  .f input[type=file] { padding: 8px 0; }
+  h4 { margin: 18px 0 8px; font-family: var(--font-display); font-size: 17px; }
+  .map-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px 12px; }
+  .map-grid label { font-size: 13px; font-weight: 600; color: var(--ink-soft); display: block; margin-bottom: 2px; }
+  .map-grid label b { color: var(--replace); }
+  .map-grid select { width: 100%; height: 36px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; background: var(--field); }
+  .map-grid select.matched { border-color: var(--green); }
+  .preview { overflow: auto; border: 1px solid var(--line); border-radius: 8px; margin-top: 8px; }
+  .preview table { border-collapse: collapse; font-size: 13px; min-width: 100%; }
+  .preview th, .preview td { padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; text-align: left; }
+  .preview th { background: var(--ink); color: #fff; font-weight: 600; font-size: 12px; position: sticky; top: 0; }
+  .preview td.bad { color: var(--replace); }
+  .stats { display: flex; gap: 18px; flex-wrap: wrap; font-size: 14px; margin-top: 10px; }
+  .stats b { font-family: var(--font-display); font-size: 18px; margin-right: 3px; }
+  .stats .warn { color: var(--replace); }
+  .hint { font-size: 13px; color: var(--ink-soft); margin: 4px 0 0; line-height: 1.4; }
+  .toast { position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 20px); background: var(--ink); color: #fff; padding: 10px 18px; border-radius: 999px; font-weight: 600; font-size: 14px; z-index: 1100; opacity: 0; transition: .25s; pointer-events: none; white-space: nowrap; max-width: 92vw; overflow: hidden; text-overflow: ellipsis; }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+  @media (max-width: 640px) {
+    .phase { grid-template-columns: 1fr; grid-template-areas: "name" "bar" "meta" "actions"; }
+    .actions { justify-content: flex-start; }
+    .row { grid-template-columns: 1fr; }
+    header h1 { font-size: 18px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <img src="ubb-logo.png" alt="Utah Broadband">
+  <h1>Pole projects</h1>
+  <a href="./">Open field app</a>
+</header>
+
+<main>
+  <div class="overview" id="overview"></div>
+  <div id="projects"><div class="empty">Loading…</div></div>
+  <form class="newproj" onsubmit="event.preventDefault(); createProject()">
+    <input type="text" id="newProjName" placeholder="New project name" maxlength="80" required>
+    <button class="btn big primary" type="submit">Add project</button>
+    <button class="btn big" type="button" onclick="openImport({})">Add phase from spreadsheet</button>
+  </form>
+</main>
+
+<dialog id="importDlg">
+  <form id="importForm" onsubmit="event.preventDefault(); submitImport()">
+    <div class="dlg-head"><h3 id="importTitle">Add phase from spreadsheet</h3><button class="btn" type="button" onclick="closeImport()">Close</button></div>
+    <div class="dlg-body">
+      <div class="row" id="targetRow">
+        <div class="f"><label for="impProject">Project</label>
+          <select id="impProject" onchange="document.getElementById('newProjWrap').hidden = this.value !== '__new'"></select>
+        </div>
+        <div class="f" id="newProjWrap" hidden><label for="impNewProject">New project name</label><input type="text" id="impNewProject" maxlength="80"></div>
+        <div class="f"><label for="impPhase">Phase name</label><input type="text" id="impPhase" placeholder="e.g. Phase 7" maxlength="80"></div>
+      </div>
+      <div class="row">
+        <div class="f"><label for="impFile">Spreadsheet (.xlsx, .xls or .csv)</label><input type="file" id="impFile" accept=".xlsx,.xls,.xlsm,.csv,.tsv" onchange="fileChosen(this.files[0])"></div>
+        <div class="f" id="sheetWrap" hidden><label for="impSheet">Sheet</label><select id="impSheet" onchange="useSheet(this.value)"></select></div>
+      </div>
+      <div id="mapping" hidden>
+        <h4>Columns</h4>
+        <p class="hint">Matched automatically from the header row. Fix any that are wrong. Coordinates can be one "lat, lng" column or separate latitude and longitude columns. Rows without usable coordinates are skipped.</p>
+        <div class="map-grid" id="mapGrid"></div>
+        <h4>Preview</h4>
+        <div class="preview" id="preview"></div>
+        <div class="stats" id="stats"></div>
+      </div>
+    </div>
+    <div class="dlg-foot">
+      <span class="status" id="importStatus"></span>
+      <button class="btn big" type="button" onclick="closeImport()">Cancel</button>
+      <button class="btn big primary" type="submit" id="importSubmit" disabled>Create phase</button>
+    </div>
+  </form>
+</dialog>
+<div class="toast" id="toast" role="status"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+const FIELDS = [
+  ['pole', 'Pole #', true], ['address', 'Address'], ['power', 'Power height'], ['catv', 'CATV height'], ['phone', 'Phone height'],
+  ['other', 'Other height'], ['crossing', 'Road / street crossing'], ['proposed', 'Proposed attachment'], ['replace', 'Suggest replace'],
+  ['material', 'Material'], ['section', 'Section'], ['coords', 'Coordinates (lat, lng)'], ['lat', 'Latitude'], ['lng', 'Longitude'],
+];
+const MEASURE = ['power', 'catv', 'phone', 'other', 'crossing', 'proposed'];
+let projects = [];
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+let toastTimer;
+function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2800); }
+
+async function api(method, url, body) {
+  const r = await fetch(url, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined, cache: 'no-store' });
+  let data = null; try { data = await r.json(); } catch (e) {}
+  if (!r.ok) throw new Error((data && data.error) || ('Request failed (' + r.status + ')'));
+  return data;
+}
+
+/* ---------- project list ---------- */
+async function load() {
+  try { projects = await api('GET', 'api/projects'); render(); }
+  catch (e) { document.getElementById('projects').innerHTML = '<div class="empty">Could not reach the server: ' + esc(e.message) + '</div>'; }
+}
+function fmtDate(ts) { return ts ? new Date(ts).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'never'; }
+function render() {
+  const phases = projects.flatMap(p => p.phases);
+  const poles = phases.reduce((a, p) => a + p.poles, 0), done = phases.reduce((a, p) => a + p.done, 0);
+  document.getElementById('overview').innerHTML = `<span><b>${projects.length}</b> project${projects.length === 1 ? '' : 's'}</span><span><b>${phases.length}</b> phase${phases.length === 1 ? '' : 's'}</span><span><b>${poles}</b> poles</span><span><b>${done}</b> measured</span>`;
+  const el = document.getElementById('projects');
+  if (!projects.length) { el.innerHTML = '<div class="empty">No projects yet. Add one below, or add a phase from a spreadsheet and name the project as you go.</div>'; return; }
+  el.innerHTML = projects.map(p => `
+    <section class="proj" data-project="${p.id}">
+      <div class="proj-head">
+        <h2 id="pname-${p.id}">${esc(p.name)}</h2>
+        <button class="btn" onclick="renameProject('${p.id}')">Rename</button>
+        <button class="btn" onclick="openImport({projectId: '${p.id}'})">Add phase</button>
+        <button class="btn danger" onclick="armDelete(this, () => deleteProject('${p.id}'), ${p.phases.length ? `'Delete project and its ${p.phases.length} phase${p.phases.length === 1 ? '' : 's'}?'` : `'Delete project?'`})">Delete</button>
+      </div>
+      ${p.phases.length ? p.phases.map(ph => `
+        <div class="phase${ph.poles && ph.done === ph.poles ? ' complete' : ''}" data-phase="${ph.id}">
+          <div class="name"><a href="./#phase/${ph.id}" id="phname-${ph.id}">${esc(ph.name)}</a><span style="font-weight:500;color:var(--ink-soft)">${ph.done} of ${ph.poles} measured</span></div>
+          <div class="bar"><i style="width:${ph.poles ? 100 * ph.done / ph.poles : 0}%"></i></div>
+          <div class="meta">Last measurement saved ${fmtDate(ph.lastSaved)}</div>
+          <div class="actions">
+            <a class="btn" href="./#phase/${ph.id}">Open</a>
+            <a class="btn" href="api/phases/${ph.id}/export.csv">Export CSV</a>
+            <button class="btn" onclick="renamePhase('${ph.id}')">Rename</button>
+            ${projects.length > 1 ? `<button class="btn" onclick="movePhase('${ph.id}')">Move</button>` : ''}
+            <button class="btn" onclick="openImport({phaseId: '${ph.id}'})">Replace poles</button>
+            <button class="btn danger" onclick="armDelete(this, () => deletePhase('${ph.id}'), 'Delete phase and its ${ph.done} measurement${ph.done === 1 ? '' : 's'}?')">Delete</button>
+          </div>
+        </div>`).join('') : '<div class="none">No phases yet. Use "Add phase" to upload a spreadsheet.</div>'}
+    </section>`).join('');
+}
+
+function armDelete(btn, action, question) {
+  if (btn.classList.contains('armed')) { btn.disabled = true; action(); return; }
+  btn.classList.add('armed'); const old = btn.textContent; btn.textContent = question;
+  setTimeout(() => { btn.classList.remove('armed'); btn.textContent = old; }, 5000);
+}
+function inlineEdit(el, value, onSave) {
+  const wrap = document.createElement('div'); wrap.className = 'inline-edit';
+  wrap.innerHTML = `<input type="text" value="${esc(value)}" maxlength="80"><button class="btn primary" type="button">Save</button><button class="btn" type="button">Cancel</button>`;
+  const [input, save, cancel] = wrap.querySelectorAll('input, button');
+  const restore = () => wrap.replaceWith(el);
+  save.onclick = async () => { const v = input.value.trim(); if (!v) return; try { await onSave(v); } catch (e) { toast(e.message); } };
+  cancel.onclick = restore;
+  input.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); save.click(); } if (e.key === 'Escape') restore(); };
+  el.replaceWith(wrap); input.focus(); input.select();
+}
+async function createProject() {
+  const input = document.getElementById('newProjName'), name = input.value.trim();
+  if (!name) return;
+  try { await api('POST', 'api/admin/projects', { name }); input.value = ''; toast('Added project ' + name); load(); } catch (e) { toast(e.message); }
+}
+function renameProject(id) { const el = document.getElementById('pname-' + id); inlineEdit(el, el.textContent, async v => { await api('PATCH', 'api/admin/projects/' + id, { name: v }); toast('Renamed'); load(); }); }
+async function deleteProject(id) { try { await api('DELETE', 'api/admin/projects/' + id); toast('Project deleted'); } catch (e) { toast(e.message); } load(); }
+function renamePhase(id) { const el = document.getElementById('phname-' + id); inlineEdit(el, el.textContent, async v => { await api('PATCH', 'api/admin/phases/' + id, { name: v }); toast('Renamed'); load(); }); }
+async function deletePhase(id) { try { await api('DELETE', 'api/admin/phases/' + id); toast('Phase deleted'); } catch (e) { toast(e.message); } load(); }
+function movePhase(id) {
+  const row = document.querySelector(`.phase[data-phase="${id}"] .actions`);
+  const cur = projects.find(p => p.phases.some(ph => ph.id === id));
+  const sel = document.createElement('select'); sel.className = 'btn';
+  sel.innerHTML = '<option value="">Move to…</option>' + projects.filter(p => p !== cur).map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('');
+  sel.onchange = async () => { if (!sel.value) return; try { await api('PATCH', 'api/admin/phases/' + id, { projectId: sel.value }); toast('Moved'); load(); } catch (e) { toast(e.message); } };
+  row.prepend(sel); sel.focus();
+}
+
+/* ---------- spreadsheet import ---------- */
+const imp = { target: {}, workbook: null, rows: [], headers: [], headerRow: 0, mapping: {}, poles: [], stats: null };
+function openImport(target) {
+  imp.target = target; imp.workbook = null; imp.rows = []; imp.poles = []; imp.stats = null;
+  const replacing = !!target.phaseId;
+  const phase = replacing ? projects.flatMap(p => p.phases).find(ph => ph.id === target.phaseId) : null;
+  document.getElementById('importTitle').textContent = replacing ? 'Replace poles in ' + (phase ? phase.name : 'phase') : 'Add phase from spreadsheet';
+  document.getElementById('importSubmit').textContent = replacing ? 'Replace poles' : 'Create phase';
+  document.getElementById('targetRow').hidden = replacing;
+  const sel = document.getElementById('impProject');
+  sel.innerHTML = projects.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('') + '<option value="__new">New project…</option>';
+  sel.value = target.projectId || (projects.length ? projects[0].id : '__new');
+  document.getElementById('newProjWrap').hidden = sel.value !== '__new';
+  document.getElementById('impNewProject').value = ''; document.getElementById('impPhase').value = '';
+  document.getElementById('impFile').value = ''; document.getElementById('sheetWrap').hidden = true; document.getElementById('mapping').hidden = true;
+  setStatus(replacing ? 'Measurements are kept for poles whose pole # is unique in both the old and the new list.' : '');
+  document.getElementById('importSubmit').disabled = true;
+  document.getElementById('importDlg').showModal();
+}
+function closeImport() { document.getElementById('importDlg').close(); }
+function setStatus(msg, err) { const s = document.getElementById('importStatus'); s.textContent = msg; s.className = 'status' + (err ? ' err' : ''); }
+
+function fileChosen(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      imp.workbook = XLSX.read(new Uint8Array(e.target.result), { type: 'array', cellDates: false });
+      const names = imp.workbook.SheetNames;
+      const sel = document.getElementById('impSheet');
+      sel.innerHTML = names.map(n => `<option>${esc(n)}</option>`).join('');
+      document.getElementById('sheetWrap').hidden = names.length < 2;
+      // prefer the sheet with the most rows
+      const best = names.map(n => [n, XLSX.utils.sheet_to_json(imp.workbook.Sheets[n], { header: 1 }).length]).sort((a, b) => b[1] - a[1])[0][0];
+      sel.value = best; useSheet(best);
+      if (!document.getElementById('impPhase').value && !imp.target.phaseId) document.getElementById('impPhase').value = guessPhaseName(file.name, best);
+    } catch (err) { setStatus('Could not read that file: ' + err.message, true); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+function guessPhaseName(fileName, sheetName) {
+  const m = (fileName + ' ' + sheetName).match(/phase\s*\d+[a-z]?/i);
+  return m ? 'Phase ' + m[0].replace(/phase\s*/i, '').toUpperCase() : '';
+}
+function useSheet(name) {
+  const ws = imp.workbook.Sheets[name];
+  const all = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
+  // header row = first row with at least 3 text cells
+  let h = all.findIndex(r => r.filter(c => typeof c === 'string' && c.trim() && isNaN(Number(c))).length >= 3);
+  if (h < 0) h = 0;
+  imp.headerRow = h;
+  imp.headers = (all[h] || []).map((c, i) => String(c || '').trim() || 'Column ' + (i + 1));
+  imp.rows = all.slice(h + 1).filter(r => r.some(c => String(c).trim() !== ''));
+  imp.mapping = autoMap(imp.headers);
+  renderMapping(); rebuild();
+}
+function norm(s) { return String(s).toLowerCase().replace(/[^a-z0-9]/g, ''); }
+function autoMap(headers) {
+  const n = headers.map(norm), m = {};
+  const find = (test) => { const i = n.findIndex((h, i) => !Object.values(m).includes(i) && test(h)); return i; };
+  m.crossing = find(h => h.includes('cross'));
+  m.proposed = find(h => h.includes('propos') || h.includes('attach'));
+  m.pole = find(h => /^pole(no|num|number|id|tag)?$|^poleid$|^tag$|^structure/.test(h) || (h.includes('pole') && !h.includes('height') && !h.includes('type') && !h.includes('material')));
+  m.power = find(h => h.includes('power') || h.includes('electric') || h.includes('neutral') || h.includes('primary') || h.includes('secondary'));
+  m.catv = find(h => h.includes('catv') || h.includes('cable') || h === 'tv');
+  m.phone = find(h => h.includes('phone') || h.includes('telco') || h.includes('telephone'));
+  m.other = find(h => h.startsWith('other'));
+  m.replace = find(h => h.includes('replace'));
+  m.material = find(h => h.includes('material') || h === 'poletype' || h === 'type');
+  m.section = find(h => h.includes('section') || h === 'area' || h === 'zone');
+  m.coords = find(h => h.includes('coord') || h.includes('latlon') || h.includes('latlng') || h === 'gps' || h === 'location' || h === 'position');
+  m.lat = find(h => /^lat/.test(h) || h === 'y');
+  m.lng = find(h => /^(lon|lng)/.test(h) || h === 'x');
+  m.address = find(h => h.includes('address') || h.includes('street') || h.includes('road') || h === 'location');
+  return m;
+}
+function renderMapping() {
+  const grid = document.getElementById('mapGrid');
+  grid.innerHTML = FIELDS.map(([key, label, req]) => `
+    <div><label for="map-${key}">${label}${req ? ' <b>*</b>' : ''}</label>
+      <select id="map-${key}" class="${imp.mapping[key] >= 0 ? 'matched' : ''}" onchange="imp.mapping['${key}'] = Number(this.value); this.className = this.value >= 0 ? 'matched' : ''; rebuild()">
+        <option value="-1">—</option>${imp.headers.map((h, i) => `<option value="${i}"${imp.mapping[key] === i ? ' selected' : ''}>${esc(h)}</option>`).join('')}
+      </select></div>`).join('');
+  document.getElementById('mapping').hidden = false;
+}
+function cellText(v) {
+  if (v == null) return '';
+  let s = String(v).trim();
+  if (/^n\s*\/?\s*a$/i.test(s)) return 'N/A';
+  if (s.toLowerCase() === 'null') return '';
+  const swapped = s.match(/^(\d+)\s*"\s*(\d+)\s*'$/);            // 23" 5'  ->  23' 5"
+  if (swapped) s = `${swapped[1]}' ${swapped[2]}"`;
+  return s;
+}
+function parseCoord(row) {
+  const m = imp.mapping;
+  let lat = NaN, lng = NaN;
+  if (m.coords >= 0) {
+    const parts = String(row[m.coords] ?? '').match(/-?\d+(?:\.\d+)?/g) || [];
+    if (parts.length >= 2) { lat = Number(parts[0]); lng = Number(parts[1]); }
+  }
+  if (!isFinite(lat) && m.lat >= 0 && m.lng >= 0) { lat = Number(String(row[m.lat]).replace(/[^\d.-]/g, '')); lng = Number(String(row[m.lng]).replace(/[^\d.-]/g, '')); }
+  if (!isFinite(lat) || !isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180 || (lat === 0 && lng === 0)) return null;
+  return { lat: +lat.toFixed(7), lng: +lng.toFixed(7) };
+}
+function rebuild() {
+  const m = imp.mapping, poles = [];
+  let skipped = 0;
+  for (const row of imp.rows) {
+    const c = parseCoord(row);
+    if (!c) { skipped++; continue; }
+    const p = { lat: c.lat, lng: c.lng };
+    for (const [key] of FIELDS) if (!['coords', 'lat', 'lng'].includes(key)) {
+      let v = m[key] >= 0 ? cellText(row[m[key]]) : '';
+      if (key === 'pole' && /^\d+\.0+$/.test(v)) v = v.replace(/\.0+$/, '');
+      if (key === 'material') v = { steel: 'Steel', wrc: 'WRC', df: 'DF', syp: 'SYP' }[v.toLowerCase()] || v;
+      p[key] = v;
+    }
+    poles.push(p);
+  }
+  imp.poles = poles;
+  const measured = poles.filter(p => MEASURE.some(f => p[f])).length;
+  const noPole = poles.filter(p => !p.pole).length;
+  imp.stats = { rows: imp.rows.length, poles: poles.length, skipped, measured, noPole };
+  const cols = FIELDS.filter(([k]) => !['coords', 'lat', 'lng'].includes(k));
+  document.getElementById('preview').innerHTML = `<table><thead><tr>${cols.map(c => `<th>${c[1]}</th>`).join('')}<th>Lat</th><th>Lng</th></tr></thead><tbody>${
+    poles.slice(0, 6).map(p => `<tr>${cols.map(([k]) => `<td class="${k === 'pole' && !p.pole ? 'bad' : ''}">${esc(p[k]) || '<span style="color:#bbb">—</span>'}</td>`).join('')}<td>${p.lat}</td><td>${p.lng}</td></tr>`).join('')
+  }${poles.length > 6 ? `<tr><td colspan="${cols.length + 2}" style="color:var(--ink-soft)">… and ${poles.length - 6} more</td></tr>` : ''}</tbody></table>`;
+  document.getElementById('stats').innerHTML = `<span><b>${imp.stats.rows}</b> rows in sheet</span><span><b>${poles.length}</b> poles with coordinates</span>` +
+    (measured ? `<span><b>${measured}</b> already measured</span>` : '') +
+    (skipped ? `<span class="warn"><b>${skipped}</b> skipped (no coordinates)</span>` : '') +
+    (noPole ? `<span class="warn"><b>${noPole}</b> without a pole #</span>` : '');
+  const ok = poles.length > 0 && m.pole >= 0;
+  document.getElementById('importSubmit').disabled = !ok;
+  if (!poles.length) setStatus('No rows have usable coordinates. Check the coordinate column mapping.', true);
+  else if (m.pole < 0) setStatus('Pick the column that holds the pole number.', true);
+  else setStatus(imp.target.phaseId ? 'Measurements are kept for poles whose pole # is unique in both the old and the new list.' : '');
+}
+async function submitImport() {
+  const btn = document.getElementById('importSubmit');
+  if (btn.disabled || !imp.poles.length) return;
+  btn.disabled = true;
+  try {
+    if (imp.target.phaseId) {
+      const r = await api('PUT', 'api/admin/phases/' + imp.target.phaseId + '/poles', { poles: imp.poles });
+      toast(`Replaced with ${r.poles} poles, kept ${r.keptMeasurements} measurement${r.keptMeasurements === 1 ? '' : 's'}`);
+    } else {
+      let projectId = document.getElementById('impProject').value;
+      const phaseName = document.getElementById('impPhase').value.trim();
+      if (!phaseName) throw new Error('Give the phase a name');
+      if (projectId === '__new') {
+        const name = document.getElementById('impNewProject').value.trim();
+        if (!name) throw new Error('Give the new project a name');
+        projectId = (await api('POST', 'api/admin/projects', { name })).id;
+      }
+      const r = await api('POST', 'api/admin/phases', { projectId, name: phaseName, poles: imp.poles });
+      toast(`Created ${phaseName} with ${r.poles} poles`);
+    }
+    closeImport(); load();
+  } catch (e) { setStatus(e.message, true); btn.disabled = false; }
+}
+
+load();
+</script>
+</body>
+</html>

@@ -1,142 +1,113 @@
-# West Mountain Phase 6 – pole measurement site
+# Pole measurement app
 
-A phone-friendly site for measuring poles in the field. It shows every pole from
-`WEST MOUNTAIN PHASE 6 POLE MEASUREMENTS.xlsx` on a map, lets the tech tap a pole and
-enter the heights, and shows the whole sheet in an Info view. No login.
+A phone-friendly site for measuring utility poles in the field, for any number of
+projects. Each project has phases (sub-phases), and each phase has its own pole list
+uploaded from a spreadsheet. The tech opens a phase, sees its poles on a map, taps a
+pole, enters the attachment heights, and the office sees progress and his location live.
 
 ## Files
 
 | File | What it is |
 |------|------------|
-| `index.html` | The whole app (map, form, info table, export) |
-| `data.js` | The 307 poles from the spreadsheet. Generated once; the app never changes it |
+| `index.html` | The field app: project picker, map, pole card, Info table, export |
+| `manage.html` | Admin page: upload spreadsheets, create / rename / move / delete projects and phases |
+| `server.js` | Node server, no dependencies. Stores everything under `data/` |
 | `ubb-logo.png` | Logo shown in the header |
-| `server.js` | Optional. Tiny Node server that saves measurements centrally |
-| `data/edits.json` | Created by `server.js`. Every saved pole lives here |
+| `data.js` | The original West Mountain Phase 6 poles. Only used once, to seed a fresh server |
+| `start-tunnel.*` | Optional helpers for a free Cloudflare quick tunnel (not needed behind Caddy) |
 
-## Hosting on your own server with a free Cloudflare URL (recommended)
+Nothing in `data/` is committed. Back that folder up.
 
-This gives you a public https address, no port forwarding, and every measurement and
-the tech's live location saved on your machine.
+## Running it behind Caddy
 
-1. Install Node.js (https://nodejs.org) and cloudflared:
-   - Windows: `winget install Cloudflare.cloudflared`
-   - Linux: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/
-2. Get the files onto the server:
+1. Install Node.js (any current version).
+2. `git clone https://github.com/msimmonsubb/clintspoles.git` and `cd clintspoles`.
+3. Run `node server.js` (port 8080 by default, `PORT=3000 node server.js` to change).
+   Keep it running with whatever you use for your other services (NSSM or Task Scheduler
+   on Windows, systemd on Linux, or a `pm2 start server.js`).
+4. Reverse proxy it in Caddy. The field app should stay open for the tech's phone, and the
+   manage page plus the admin API should sit behind basic auth:
 
    ```
-   git clone https://github.com/msimmonsubb/clintspoles.git
-   cd clintspoles
+   poles.simmonssurplus.com {
+       @admin path /manage.html /api/admin/*
+       basic_auth @admin {
+           mike $2a$14$...bcrypt-hash-from-caddy-hash-password...
+       }
+       reverse_proxy localhost:8080
+   }
    ```
 
-3. Start everything:
-   - Windows: `powershell -ExecutionPolicy Bypass -File .\start-tunnel.ps1`
-   - Linux/macOS: `chmod +x start-tunnel.sh && ./start-tunnel.sh`
+   Generate the hash with `caddy hash-password`. Everything the phone uses (`/`, `/api/projects`,
+   `/api/phases/...`, `/api/location...`) stays open, so the tech never sees a login.
 
-   It prints `Pole site is live at: https://xxxx-xxxx.trycloudflare.com` and saves the same
-   address to `tunnel-url.txt`. Send that link to the tech.
+5. Open `https://poles.simmonssurplus.com/manage.html` to add projects.
 
-4. Leave the window open. Closing it (or Ctrl+C) stops the site.
+On first start with an empty `data/` folder the server imports `data.js` as project
+**West Mountain**, phase **Phase 6**. If an old `data/edits.json` from the single-phase
+version exists it is imported too and renamed `edits.json.migrated`.
 
-The free trycloudflare.com address is different every time the script starts, so restart
-it as rarely as you can and re-send the link when you do. Cloudflare gives no uptime
-promise on free quick tunnels. If you ever want a permanent address, add a domain to
-Cloudflare and create a named tunnel instead; the site itself needs no changes.
+To update after a change on GitHub: stop the server, `git pull`, start it again.
 
-To update the site after a change on GitHub: stop the script, run `git pull`, start it again.
+## Manage page
 
-### Live location
+- **Add project** creates an empty project. **Add phase from spreadsheet** (per project, or the
+  button at the bottom which can also create the project) opens the import dialog.
+- **Import dialog**: pick the file (.xlsx, .xls or .csv), and if the workbook has several sheets
+  pick the sheet. The header row is found automatically and columns are matched to the app's
+  fields by name; fix any that are wrong. Coordinates can be one "lat, lng" column or separate
+  latitude and longitude columns. The preview shows the first rows and how many rows will be
+  skipped for missing coordinates. Only the pole number column is required.
+- Per phase: **Open** (field app), **Export CSV**, **Rename**, **Move** to another project,
+  **Replace poles** (upload a new list; measurements saved in the app are kept for poles whose
+  pole number is unique in both the old and the new list), **Delete**.
+- Delete buttons ask once more before doing anything.
 
-When the site is served by `server.js`, the page asks the browser for location
-permission on load. Once the tech allows it, his position is sent to the server every
-few seconds while the page is open. Everyone else looking at the map sees a blue dot
-labelled "Clint" with how long ago it was updated (grey after 5 minutes without an
-update). Tapping the dot shows his trail for today.
+## Field app
 
-The label comes from `TECH_NAME` near the top of the script in `index.html`. Change it
-there for a different tech. Any device that allows location on this site reports under
-that same label, so deny the location prompt on office computers.
+- The first screen lists projects and phases with progress. The phone remembers the last
+  phase opened and goes straight back to it. Tapping the phase name in the header returns
+  to the list.
+- **Map** shows every pole: white to do, orange measured, red flagged for replacement. Zoom in
+  for pole numbers. Satellite view helps spot the actual pole. The pin button jumps to the
+  nearest unmeasured pole, the crosshair centres on the phone.
+- Tap a pole to open its card: feet and inches for Power, CATV, Phone, Other, Road crossing
+  and Proposed attachment (each with N/A), Suggest replace, Material, Section, pole number,
+  address, and a button to replace the coordinates with the phone's GPS position.
+- **Save pole** stores it on the phone and sends it to the server. The header shows *Synced*,
+  or *N waiting to sync* when there is no signal; it retries automatically. The phase's pole
+  list is cached on the phone so the map still works without signal.
+- **Info** shows the full sheet with search and To do / Measured filters. **Export sheet**
+  downloads an .xlsx in the original column layout.
 
-There is no on/off switch. To stop being tracked, revoke location permission for the
-site in the phone's browser settings, or close the page.
+## Live location
 
-Phones stop sending GPS from a browser tab once the screen locks or another app is in
-front, so the dot updates while the page is up and pauses in between. While sharing is
-on, the page asks the phone to keep the screen awake to help with that.
-
-Location data is stored in `data/locations.json` (latest position per label) and
-`data/track-YYYY-MM-DD.jsonl` (one line per report). The map shows positions from the
-last 2 hours. To wipe the remembered dots right away (for example after testing from
-several devices), run this on the server while it is up:
+When the tech allows location on his phone, his position is sent to the server every few
+seconds while the page is open, and everyone else sees a blue dot labelled with `TECH_NAME`
+(near the top of the script in `index.html`, currently "Clint"). Tapping the dot shows his
+trail for today. Positions older than 2 hours are not shown. Every device that allows
+location on the site reports under the same label, so deny the location prompt on office
+computers. To wipe remembered positions:
 
 ```
 curl -X DELETE http://localhost:8080/api/locations
 ```
 
-Trail files are not affected.
+Phones stop sending GPS from a browser tab once the screen locks or another app is in
+front; the page asks the phone to keep the screen awake to help with that.
 
-## Other ways to host it
+## Data layout
 
-### Option A – server on your local network only
+```
+data/
+  projects.json            projects and phases
+  phases/<id>.json         one file per phase: seed rows from the sheet + saved edits
+  locations.json           last position per label
+  track-YYYY-MM-DD.jsonl   one line per position report
+```
 
-Everything the tech saves on the phone is sent to the server, so you can watch progress
-from your own computer and download the finished sheet at any time.
+## Notes on the original spreadsheet
 
-1. Install Node.js (any current version) on the machine that will host it.
-2. In this folder run:
-
-   ```
-   node server.js
-   ```
-
-3. It prints the address to open, for example `http://192.168.1.20:8080`.
-   Open that on the phone (same Wi-Fi/VPN) or put it behind your normal reverse proxy /
-   HTTPS if you want to reach it over the internet.
-
-   The phone's GPS features ("Show my location", "Nearest pole", "Use my GPS position")
-   need HTTPS unless the address is `localhost`. Browsers block geolocation on plain
-   `http://` addresses, so for real field use put it behind HTTPS (Cloudflare Tunnel,
-   Caddy, nginx + Let's Encrypt, etc.). Everything else works over plain http.
-
-4. Get the data back:
-   - Open the site, go to **Info**, tap **Export sheet** (downloads an .xlsx), or
-   - `http://<host>:8080/api/export.csv` for a CSV, or
-   - copy `data/edits.json` (raw saved edits).
-
-To change the port: `PORT=3000 node server.js` (PowerShell: `$env:PORT=3000; node server.js`).
-
-### Option B – static hosting only
-
-Copy `index.html`, `data.js` and `ubb-logo.png` to any static host (GitHub Pages,
-Netlify, an S3 bucket, your existing web server). Everything still works, but
-measurements are saved only in that phone's browser storage. The tech then uses
-**Info → Export sheet** to download the .xlsx and send it to you. Clearing the browser
-data on the phone would erase unsent measurements, so export regularly.
-
-## Using it in the field
-
-- **Map** shows every pole. White = still to do, orange = measured, red = flagged for replacement.
-  Zoom in to see pole numbers. Satellite view helps spot the actual pole.
-- The **pin button** jumps to the nearest pole that still needs measuring. The **crosshair** centres on you.
-- Tap a pole to open its card. Type feet then inches for each attachment (the cursor
-  jumps from feet to inches automatically). Tap **N/A** when there is no attachment.
-- **Suggest replace**, **Material**, **Section**, pole number and address are editable too.
-- **Use my GPS position** overwrites the pole's coordinates with the phone's location (asks first if accuracy is poor).
-- **Save pole** stores it. The header shows *Synced* when the server has it, or
-  *N waiting to sync* when the phone has no signal; it retries automatically.
-- **Info** shows the full sheet. Search by pole number or street, filter To do / Measured,
-  tap a row to edit it, **Export sheet** downloads the .xlsx in the original column layout.
-
-## Regenerating data.js from a new spreadsheet
-
-`data.js` was generated from the sheet named `ALL`. If you get a new version of the
-workbook, regenerate it with the same column order (Pole #, Address, Power, CATV, Phone,
-Other, Road crossing, Proposed, Suggest replace, Material, Coords, Section). Keep the
-`id` values stable, because saved edits are keyed by `id`.
-
-Notes on the seed data:
-- Material values were normalised (`steel` → `Steel`; the single `null` became blank).
-- One road-crossing entry written as `23" 5'` was read as `23' 5"`.
-- `N/a` in the sheet is shown as `N/A`.
-- Pole numbers 5064 and 5619 each appear twice in the sheet, and six rows are just `RMP`.
-  They are kept as separate poles with their own coordinates.
+Material values were normalised (`steel` → `Steel`, `null` → blank), `N/a` became `N/A`, one
+crossing height written as `23" 5'` was read as `23' 5"`, pole numbers 5064 and 5619 appear
+twice, and six rows are just `RMP`. Duplicates are kept as separate poles.

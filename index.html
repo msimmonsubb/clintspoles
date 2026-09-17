@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light">
 <meta name="theme-color" content="#3a3a3a">
-<title>West Mountain Phase 6 Poles</title>
+<title>Pole Measurements</title>
 <link rel="icon" href="ubb-logo.png">
 <link rel="apple-touch-icon" href="ubb-logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -56,14 +56,23 @@
     column-gap: 14px; row-gap: 2px; align-items: center;
   }
   .logo { grid-area: logo; height: 40px; width: auto; display: block; }
-  .title { grid-area: title; font-family: var(--font-display); font-weight: 700; font-size: 20px; line-height: 1.1; margin: 0; letter-spacing: .01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .progress { grid-area: progress; display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--ink-soft); min-width: 0; }
+  .title { grid-area: title; min-width: 0; display: flex; align-items: center; gap: 6px; }
+  .title button {
+    border: 0; background: none; padding: 0; text-align: left; min-width: 0; max-width: 100%;
+    font-family: var(--font-display); font-weight: 700; font-size: 20px; line-height: 1.1; letter-spacing: .01em;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .title button small { font-family: var(--font); font-size: 13px; font-weight: 500; color: var(--ink-soft); margin-left: 6px; }
+  .title button::after { content: " ▾"; color: var(--orange-deep); font-size: 15px; }
+  body[data-screen="projects"] .title button::after { content: ""; }
+  .progress { grid-area: progress; display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--ink-soft); min-width: 0; min-height: 16px; }
   .progress .bar { flex: 1 1 60px; max-width: 140px; height: 6px; background: var(--field); border-radius: 3px; overflow: hidden; }
   .progress .bar i { display: block; height: 100%; background: var(--orange); width: 0; transition: width .3s; }
   .progress .sync { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .progress .sync::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ink-soft); margin-right: 5px; vertical-align: 1px; }
   .progress .sync.ok::before { background: #2e9e4f; }
   .progress .sync.pending::before { background: var(--orange); }
+  body[data-screen="projects"] .progress > :not(.sync) { display: none; }
 
   .toggle { grid-area: toggle; display: flex; background: var(--field); border-radius: 999px; padding: 3px; }
   .toggle button {
@@ -72,11 +81,30 @@
     min-height: 40px;
   }
   .toggle button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+  body[data-screen="projects"] .toggle { visibility: hidden; }
 
   /* ---------- Views ---------- */
   main { flex: 1 1 auto; position: relative; min-height: 0; }
   .view { position: absolute; inset: 0; display: none; }
   .view.active { display: block; }
+
+  /* Projects */
+  #viewProjects { overflow: auto; -webkit-overflow-scrolling: touch; padding: 16px; padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
+  .projects-inner { max-width: 640px; margin: 0 auto; }
+  .proj { background: var(--paper); border-radius: 14px; border: 1px solid var(--line); margin-bottom: 14px; overflow: hidden; }
+  .proj h2 { margin: 0; padding: 12px 16px 8px; font-family: var(--font-display); font-size: 20px; }
+  .phase { display: grid; grid-template-columns: 1fr auto; grid-template-areas: "name count" "bar bar"; gap: 4px 10px; align-items: center;
+    width: 100%; border: 0; border-top: 1px solid var(--line); background: none; padding: 12px 16px; text-align: left; }
+  .phase:active { background: #fff4e8; }
+  .phase .pname { grid-area: name; font-weight: 600; font-size: 17px; }
+  .phase .pcount { grid-area: count; color: var(--ink-soft); font-size: 14px; font-variant-numeric: tabular-nums; }
+  .phase .pbar { grid-area: bar; height: 6px; background: var(--field); border-radius: 3px; overflow: hidden; }
+  .phase .pbar i { display: block; height: 100%; background: var(--orange); }
+  .phase.complete .pbar i { background: #2e9e4f; }
+  .proj .none { padding: 10px 16px 14px; color: var(--ink-soft); font-size: 14px; border-top: 1px solid var(--line); }
+  .empty-projects { text-align: center; color: var(--ink-soft); padding: 40px 16px; line-height: 1.5; }
+  .empty-projects a, .manage-link { color: var(--orange-deep); font-weight: 600; text-decoration: none; }
+  .manage-link { display: block; text-align: center; margin-top: 8px; font-size: 14px; }
 
   /* Map */
   #map { position: absolute; inset: 0; background: #e6e4dd; }
@@ -107,7 +135,6 @@
   .person b small { font-weight: 400; opacity: .85; margin-left: 4px; }
   .person.stale i { background: #9a9a9a; box-shadow: 0 2px 6px rgba(0,0,0,.3); }
   .person.stale b { background: #9a9a9a; }
-
 
   /* List */
   .list-bar { display: flex; gap: 8px; padding: 10px 16px; background: var(--paper); border-bottom: 1px solid var(--line); align-items: center; flex-wrap: wrap; }
@@ -209,28 +236,30 @@
     .sheet.show { transform: none; }
     .scrim { display: none; }
     .sheet-head::before { display: none; }
-    .title { font-size: 22px; }
+    .title button { font-size: 22px; }
   }
   @media (max-width: 480px) {
     header { padding: 6px 12px; padding-top: calc(6px + env(safe-area-inset-top)); grid-template-columns: auto 1fr; grid-template-areas: "logo title" "logo progress" "toggle toggle"; row-gap: 4px; }
     .logo { height: 34px; }
-    .title { font-size: 17px; }
+    .title button { font-size: 17px; }
+    .title button small { display: none; }
     .toggle { margin-top: 4px; }
+    body[data-screen="projects"] .toggle { display: none; }
     .toggle button { flex: 1; }
     .list-bar { padding: 8px 12px; }
   }
   @media (prefers-reduced-motion: reduce) { .sheet, .scrim, .toast, .progress .bar i { transition: none; } }
 </style>
 </head>
-<body>
+<body data-screen="projects">
 
 <header>
   <img class="logo" src="ubb-logo.png" alt="Utah Broadband">
-  <h1 class="title">West Mountain Phase 6</h1>
+  <div class="title"><button id="titleBtn" onclick="location.hash = ''" title="Choose a project">Pole measurements</button></div>
   <div class="progress">
-    <span id="progText">0 of 0 measured</span>
+    <span id="progText"></span>
     <span class="bar"><i id="progBar"></i></span>
-    <span class="sync local" id="syncPill">Saved on this phone</span>
+    <span class="sync local" id="syncPill">Connecting…</span>
   </div>
   <div class="toggle" role="tablist" aria-label="View">
     <button id="tabMap" role="tab" aria-pressed="true" onclick="showView('map')">Map</button>
@@ -239,7 +268,11 @@
 </header>
 
 <main>
-  <section id="viewMap" class="view active">
+  <section id="viewProjects" class="view active">
+    <div class="projects-inner" id="projectsInner"><div class="empty-projects">Loading projects…</div></div>
+  </section>
+
+  <section id="viewMap" class="view">
     <div id="map"></div>
     <div class="legend" aria-hidden="true"><span>To do</span><span class="done">Measured</span><span class="replace">Replace</span></div>
     <div class="map-tools">
@@ -322,18 +355,17 @@
 </div>
 <div class="toast" id="toast" role="status"></div>
 
-<script src="data.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
 <script>
 /* =========================================================
    Data model
-   - SEED: rows from the spreadsheet (data.js), never modified
-   - edits: per-pole field overrides, saved in localStorage and
-     (if the site is hosted with server.js) synced to the server
+   - current: the open phase {id, name, projectName}
+   - SEED: that phase's pole rows from the spreadsheet (from the
+     server, cached on the phone so the map works with no signal)
+   - edits: per-pole field overrides for that phase, saved on the
+     phone and synced to the server
    ========================================================= */
-const SEED = window.POLE_DATA || [];
-const LS_KEY = 'wm6-pole-edits-v1';
 const TECH_NAME = 'Clint';   // label shown on the office map for whoever allows location on this site
 const HEIGHT_FIELDS = [
   ['power',    'Power',                   'lowest power conductor / neutral'],
@@ -345,14 +377,19 @@ const HEIGHT_FIELDS = [
 ];
 const MEASURE_FIELDS = HEIGHT_FIELDS.map(f => f[0]);
 
+let current = null;   // {id, name, projectName}
+let SEED = [];
 let edits = {};
-try { edits = JSON.parse(localStorage.getItem(LS_KEY) || '{}') || {}; } catch (e) { edits = {}; }
+
+const lsGet = (k, def) => { try { const v = localStorage.getItem(k); return v == null ? def : JSON.parse(v); } catch (e) { return def; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } };
 
 function pole(id) { const s = SEED.find(p => p.id === id); return Object.assign({}, s, edits[id] || {}); }
 function allPoles() { return SEED.map(s => Object.assign({}, s, edits[s.id] || {})); }
 function isDone(p) { return MEASURE_FIELDS.some(f => (p[f] || '').trim() !== ''); }
 function isReplace(p) { return /^y/i.test(p.replace || ''); }
-function saveLocal() { try { localStorage.setItem(LS_KEY, JSON.stringify(edits)); } catch (e) { toast('Could not save on this phone: storage is full or blocked'); } }
+function saveLocal() { if (current && !lsSet('poles-edits-' + current.id, edits)) toast('Could not save on this phone: storage is full or blocked'); }
+function cachePhase() { if (current) lsSet('poles-phase-' + current.id, { name: current.name, projectName: current.projectName, seed: SEED }); }
 
 /* Heights are stored as text exactly like the sheet: 28' 4"  /  18'  /  N/A */
 function parseHeight(str) {
@@ -373,58 +410,86 @@ function formatHeight(h) {
 }
 
 /* =========================================================
-   Server sync (optional). Works fine without a server.
+   Server sync
    ========================================================= */
-const sync = { available: false, pending: new Set() };
-async function loadFromServer() {
+const sync = { available: false, pending: new Set(), everConnected: false };
+function onServerContact() {
+  if (sync.everConnected) return;
+  sync.everConnected = true;
+  pollLocations();
+  startWatch(true);
+  if (me) onPosition();
+}
+async function syncPhase() {
+  if (!current) return;
+  const id = current.id;
   try {
-    const r = await fetch('api/poles', { cache: 'no-store' });
+    const r = await fetch('api/phases/' + id, { cache: 'no-store' });
+    if (r.status === 404) { toast('This phase no longer exists'); lsSet('poles-last-phase', null); location.hash = ''; return; }
     if (!r.ok) throw new Error(r.status);
-    const remote = await r.json();
+    const data = await r.json();
+    if (!current || current.id !== id) return;          // user moved on while we were fetching
+    current.name = data.name; current.projectName = data.projectName;
+    renderHeader();
+    const seedChanged = JSON.stringify(data.seed) !== JSON.stringify(SEED);
+    const remote = data.edits || {};
     let changed = false;
-    for (const id in remote) {
-      const l = edits[id], s = remote[id];
-      if (!l || (s.updatedAt || 0) > (l.updatedAt || 0)) { edits[id] = s; changed = true; }
-      else if ((l.updatedAt || 0) > (s.updatedAt || 0)) sync.pending.add(Number(id));
+    sync.pending.clear();
+    for (const pid in remote) {
+      const l = edits[pid], s = remote[pid];
+      if (!l || (s.updatedAt || 0) > (l.updatedAt || 0)) { edits[pid] = s; changed = true; }
+      else if ((l.updatedAt || 0) > (s.updatedAt || 0)) sync.pending.add(Number(pid));
     }
-    for (const id in edits) if (!remote[id]) sync.pending.add(Number(id));
-    const firstContact = !sync.available;
+    for (const pid in edits) if (!remote[pid]) sync.pending.add(Number(pid));
     sync.available = true;
-    if (firstContact) { pollLocations(); startWatch(true); if (me) onPosition(); }
-    if (changed) { saveLocal(); refreshAll(); }
+    if (seedChanged) { SEED = data.seed; cachePhase(); buildMarkers(true); }
+    if (changed) saveLocal();
+    if (seedChanged || changed) refreshAll();
+    onServerContact();
     flushPending();
   } catch (e) { sync.available = false; }
   updateSyncPill();
 }
-async function pushToServer(id) {
-  if (!sync.available) { sync.pending.add(id); updateSyncPill(); return; }
+async function pushToServer(pid) {
+  if (!sync.available || !current) { sync.pending.add(pid); updateSyncPill(); return; }
   try {
-    const r = await fetch('api/poles/' + id, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(edits[id]) });
+    const r = await fetch('api/phases/' + current.id + '/poles/' + pid, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(edits[pid]) });
     if (!r.ok) throw new Error(r.status);
-    sync.pending.delete(id);
-  } catch (e) { sync.pending.add(id); }
+    sync.pending.delete(pid);
+  } catch (e) { sync.pending.add(pid); }
   updateSyncPill();
 }
-async function flushPending() { for (const id of Array.from(sync.pending)) await pushToServer(id); }
+async function flushPending() { for (const pid of Array.from(sync.pending)) await pushToServer(pid); }
 function updateSyncPill() {
   const el = document.getElementById('syncPill');
-  if (!sync.available) { el.className = 'sync local'; el.textContent = 'Saved on this phone'; }
+  if (!sync.available) { el.className = 'sync local'; el.textContent = current ? 'Saved on this phone' : 'No connection'; }
   else if (sync.pending.size) { el.className = 'sync pending'; el.textContent = sync.pending.size + ' waiting to sync'; }
   else { el.className = 'sync ok'; el.textContent = 'Synced'; }
 }
-window.addEventListener('online', loadFromServer);
-setInterval(loadFromServer, 60000);
+window.addEventListener('online', () => { if (current) syncPhase(); else loadProjects(); });
+setInterval(() => { if (current) syncPhase(); else loadProjects(); }, 60000);
 
 /* =========================================================
-   Views
+   Screens and routing
    ========================================================= */
+function showScreen(name) {
+  document.body.dataset.screen = name;
+  document.getElementById('viewProjects').classList.toggle('active', name === 'projects');
+  if (name === 'projects') { document.getElementById('viewMap').classList.remove('active'); document.getElementById('viewList').classList.remove('active'); }
+  else showView(lsGet('poles-view', 'map'));
+}
 function showView(name) {
   document.getElementById('viewMap').classList.toggle('active', name === 'map');
   document.getElementById('viewList').classList.toggle('active', name === 'list');
   document.getElementById('tabMap').setAttribute('aria-pressed', name === 'map');
   document.getElementById('tabList').setAttribute('aria-pressed', name === 'list');
   if (name === 'map') setTimeout(() => map.invalidateSize(), 50); else renderTable();
-  try { localStorage.setItem('wm6-view', name); } catch (e) {}
+  lsSet('poles-view', name);
+}
+function renderHeader() {
+  const b = document.getElementById('titleBtn');
+  if (current) { b.innerHTML = esc(current.name || 'Phase') + (current.projectName ? '<small>' + esc(current.projectName) + '</small>' : ''); document.title = (current.projectName ? current.projectName + ' ' : '') + current.name + ' poles'; }
+  else { b.textContent = 'Pole measurements'; document.title = 'Pole Measurements'; }
 }
 function refreshProgress() {
   const all = allPoles(), done = all.filter(isDone).length;
@@ -433,29 +498,89 @@ function refreshProgress() {
 }
 function refreshAll() { refreshProgress(); refreshMarkers(); if (document.getElementById('viewList').classList.contains('active')) renderTable(); }
 
+function routeHash() {
+  const m = location.hash.match(/^#phase\/([0-9a-f]{8})$/);
+  if (m) openPhase(m[1]); else showProjects();
+}
+window.addEventListener('hashchange', routeHash);
+
+async function showProjects() {
+  closeSheet();
+  current = null; SEED = []; edits = {}; sync.pending.clear();
+  renderHeader(); showScreen('projects'); updateSyncPill();
+  await loadProjects();
+}
+async function loadProjects() {
+  let projects = null;
+  try {
+    const r = await fetch('api/projects', { cache: 'no-store' });
+    if (!r.ok) throw new Error(r.status);
+    projects = await r.json();
+    sync.available = true; lsSet('poles-projects', projects); onServerContact();
+  } catch (e) { sync.available = false; projects = lsGet('poles-projects', null); }
+  updateSyncPill();
+  if (current) return;                                    // user opened a phase meanwhile
+  renderProjects(projects);
+}
+function renderProjects(projects) {
+  const el = document.getElementById('projectsInner');
+  if (!projects) { el.innerHTML = '<div class="empty-projects">No connection and no projects saved on this phone yet.<br>Connect and reload.</div>'; return; }
+  if (!projects.length) { el.innerHTML = '<div class="empty-projects">No projects yet.<br><a href="manage.html">Add one on the manage page</a></div>'; return; }
+  el.innerHTML = projects.map(p => `
+    <section class="proj"><h2>${esc(p.name)}</h2>
+      ${p.phases.length ? p.phases.map(ph => `
+        <button class="phase${ph.poles && ph.done === ph.poles ? ' complete' : ''}" onclick="location.hash = '#phase/${ph.id}'">
+          <span class="pname">${esc(ph.name)}</span>
+          <span class="pcount">${ph.done} of ${ph.poles} measured</span>
+          <span class="pbar"><i style="width:${ph.poles ? 100 * ph.done / ph.poles : 0}%"></i></span>
+        </button>`).join('') : '<div class="none">No phases yet</div>'}
+    </section>`).join('') + '<a class="manage-link" href="manage.html">Manage projects</a>';
+}
+
+async function openPhase(id) {
+  if (current && current.id === id) return;
+  closeSheet();
+  current = { id, name: '', projectName: '' };
+  edits = lsGet('poles-edits-' + id, {});
+  sync.pending.clear();
+  const cached = lsGet('poles-phase-' + id, null);
+  SEED = cached ? cached.seed : [];
+  if (cached) { current.name = cached.name; current.projectName = cached.projectName; }
+  renderHeader(); showScreen('phase'); updateSyncPill();
+  buildMarkers(true); refreshProgress();
+  lsSet('poles-last-phase', id);
+  await syncPhase();
+  if (current && current.id === id && !SEED.length) toast(sync.available ? 'This phase has no poles' : 'No connection, and this phase is not saved on this phone yet');
+}
+
 /* ---------- Map ---------- */
 const map = L.map('map', { zoomControl: false, tapTolerance: 20 });
 L.control.zoom({ position: 'topright' }).addTo(map);
 const streets = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' });
 const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Imagery &copy; Esri' });
 streets.addTo(map);
+map.setView([40.1, -111.75], 12);
 const renderer = L.canvas({ tolerance: 12 });
-const markers = {};
+const poleLayer = L.layerGroup().addTo(map);
+let markers = {};
+let selectedId = null;
 function markerStyle(p, selected) {
   const rep = isReplace(p), done = isDone(p);
   return { radius: selected ? 11 : 8, weight: 2, color: rep ? '#c8322b' : '#3a3a3a', fillColor: rep ? '#c8322b' : done ? '#f68b1d' : '#ffffff', fillOpacity: 1, renderer };
 }
-let selectedId = null;
-SEED.forEach(s => {
-  const p = pole(s.id);
-  const m = L.circleMarker([p.lat, p.lng], markerStyle(p, false)).addTo(map);
-  m.bindTooltip(p.pole || '?', { permanent: true, direction: 'right', offset: [8, 0], className: 'pole-label' });
-  m.on('click', () => openSheet(s.id));
-  markers[s.id] = m;
-});
-if (SEED.length) map.fitBounds(L.latLngBounds(SEED.map(p => [p.lat, p.lng])).pad(0.05));
+function buildMarkers(fit) {
+  poleLayer.clearLayers(); markers = {};
+  SEED.forEach(s => {
+    const p = pole(s.id);
+    const m = L.circleMarker([p.lat, p.lng], markerStyle(p, s.id === selectedId)).addTo(poleLayer);
+    m.bindTooltip(p.pole || '?', { permanent: true, direction: 'right', offset: [8, 0], className: 'pole-label' });
+    m.on('click', () => openSheet(s.id));
+    markers[s.id] = m;
+  });
+  if (fit && SEED.length) { map.invalidateSize(); map.fitBounds(L.latLngBounds(SEED.map(p => [p.lat, p.lng])).pad(0.05)); }
+}
 function refreshMarkers() {
-  SEED.forEach(s => { const p = pole(s.id); const m = markers[s.id]; m.setStyle(markerStyle(p, s.id === selectedId)); m.setLatLng([p.lat, p.lng]); m.setTooltipContent(p.pole || '?'); });
+  SEED.forEach(s => { const p = pole(s.id); const m = markers[s.id]; if (!m) return; m.setStyle(markerStyle(p, s.id === selectedId)); m.setLatLng([p.lat, p.lng]); m.setTooltipContent(p.pole || '?'); });
 }
 function updateLabels() { document.getElementById('map').classList.toggle('hide-labels', map.getZoom() < 16); }
 map.on('zoomend', updateLabels); updateLabels();
@@ -498,13 +623,13 @@ function goNearest() {
   startWatch();
   if (!me) { toast('Finding your location…'); return; }
   const todo = allPoles().filter(p => !isDone(p));
-  if (!todo.length) { toast('Every pole is measured'); return; }
+  if (!todo.length) { toast(SEED.length ? 'Every pole is measured' : 'No poles in this phase'); return; }
   const best = todo.reduce((a, p) => { const d = dist(me, p); return d < a.d ? { p, d } : a; }, { p: null, d: Infinity });
   map.flyTo([best.p.lat, best.p.lng], Math.max(map.getZoom(), 18));
   openSheet(best.p.id);
 }
 
-/* ---------- Live location sharing (needs the server) ---------- */
+/* ---------- Live location (needs the server) ---------- */
 // Tracking is automatic: once the browser grants location permission and the server is
 // reachable, the phone reports its position (labelled TECH_NAME) while the page is open.
 const share = { name: TECH_NAME, lastSent: 0, lastPos: null, timer: null, wake: null };
@@ -526,7 +651,6 @@ async function sendLocation() {
 }
 // keep the screen awake while sharing so the GPS keeps flowing (supported on Android Chrome and recent iOS Safari)
 async function requestWake() { try { if (navigator.wakeLock && !share.wake) share.wake = await navigator.wakeLock.request('screen'); } catch (e) {} }
-function releaseWake() { try { share.wake && share.wake.release(); } catch (e) {} share.wake = null; }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && sharing()) { share.wake = null; requestWake(); sendLocation(); } });
 
 /* other people on the map */
@@ -604,6 +728,7 @@ function setReplace(v) {
 let sheetCoords = null;
 function openSheet(id) {
   const p = pole(id);
+  if (!p.id) return;
   selectedId = id; refreshMarkers();
   document.getElementById('sheetTitle').innerHTML = 'Pole ' + esc(p.pole || '?') + (p.address ? '<small>' + esc(p.address) + '</small>' : '');
   updateDistance();
@@ -681,22 +806,26 @@ function renderTable() {
       <td>${cell(p.crossing)}</td><td>${cell(p.proposed)}</td><td>${cell(p.replace)}</td><td>${cell(p.material)}</td>
       <td class="muted">${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}</td><td>${cell(p.section)}</td>
     </tr>`).join('');
-  document.getElementById('empty').hidden = rows.length > 0;
+  document.getElementById('empty').hidden = rows.length > 0 || !SEED.length;
+  if (!SEED.length) { document.getElementById('empty').hidden = false; document.getElementById('empty').textContent = 'No poles in this phase.'; }
+  else document.getElementById('empty').textContent = 'No poles match that search.';
 }
 
 /* ---------- Export: same columns as the original sheet ---------- */
 function exportSheet() {
+  if (!current) return;
   const header = ['Pole #', 'Address', 'Power Height', 'CATV Height', 'Phone Height', 'Other Height', 'Road / Street Crossing Height', 'Proposed Attachment Height', 'SUGGEST REPLACE', 'Material', 'Coords', 'Section'];
   const rows = allPoles().map(p => [p.pole, p.address, p.power, p.catv, p.phone, p.other, p.crossing, p.proposed, p.replace, p.material, p.lat + ', ' + p.lng, p.section]);
   const stamp = new Date().toISOString().slice(0, 10);
+  const base = ((current.projectName ? current.projectName + ' ' : '') + current.name + ' poles ' + stamp).replace(/[\\/:*?"<>|]+/g, '-');
   if (window.XLSX) {
     const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
     ws['!cols'] = [8, 18, 13, 12, 12, 12, 26, 26, 16, 10, 36, 10].map(w => ({ wch: w }));
-    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'ALL');
-    XLSX.writeFile(wb, 'WEST MOUNTAIN PHASE 6 POLE MEASUREMENTS ' + stamp + '.xlsx');
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, current.name.slice(0, 31) || 'Poles');
+    XLSX.writeFile(wb, base + '.xlsx');
   } else {
     const csv = [header, ...rows].map(r => r.map(v => '"' + String(v ?? '').replace(/"/g, '""') + '"').join(',')).join('\r\n');
-    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = 'WEST MOUNTAIN PHASE 6 POLE MEASUREMENTS ' + stamp + '.csv'; a.click();
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = base + '.csv'; a.click();
   }
   toast('Sheet exported');
 }
@@ -706,10 +835,11 @@ let toastTimer;
 function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2600); }
 
 /* ---------- Boot ---------- */
-refreshProgress();
-loadFromServer();
-let startView = 'map'; try { startView = localStorage.getItem('wm6-view') || 'map'; } catch (e) {}
-if (startView === 'list') showView('list');
+(function boot() {
+  const last = lsGet('poles-last-phase', null);
+  if (!location.hash && last && /^[0-9a-f]{8}$/.test(last)) { location.replace('#phase/' + last); }
+  routeHash();
+})();
 </script>
 </body>
 </html>
